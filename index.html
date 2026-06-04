@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stuudium Tasks</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { margin-bottom: 20px; }
+        .box { background: white; padding: 20px; border-radius: 4px; margin-bottom: 20px; }
+        input[type="password"], input[type="text"] { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; }
+        button { width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 8px; }
+        button:hover { background: #0056b3; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        button.green { background: #28a745; }
+        button.green:hover { background: #218838; }
+        button.small { width: auto; padding: 6px 12px; font-size: 0.85em; margin-bottom: 0; }
+        .error { background: #fee; padding: 12px; border: 1px solid #f00; border-radius: 4px; margin-bottom: 10px; color: #c00; }
+        .info { background: #efe; padding: 12px; border: 1px solid #0a0; border-radius: 4px; margin-bottom: 10px; color: #060; }
+        .warning { background: #fff3cd; padding: 12px; border: 1px solid #ffc107; border-radius: 4px; margin-bottom: 10px; color: #856404; }
+        .task { background: white; padding: 15px; margin-bottom: 10px; border-radius: 4px; border-left: 4px solid #007bff; display: flex; align-items: flex-start; gap: 10px; }
+        .task.completed { opacity: 0.5; border-left-color: #aaa; }
+        .task input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; opacity: 0.6; cursor: not-allowed; }
+        .task-title { font-weight: bold; margin-bottom: 4px; }
+        .task-meta { font-size: 0.85em; color: #666; }
+        .task-meta span { margin-right: 12px; }
+        .loading { text-align: center; padding: 20px; color: #666; }
+        .last-sync { font-size: 0.85em; color: #999; margin-bottom: 10px; }
+        .hidden { display: none !important; }
+        code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+        ol { padding-left: 20px; line-height: 2; }
+
+        /* Toolbar */
+        .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+        .toolbar button.green { width: auto; padding: 8px 16px; margin-bottom: 0; }
+
+        /* Settings modal */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-box { background: white; border-radius: 8px; padding: 24px; width: 90%; max-width: 640px; max-height: 88vh; overflow-y: auto; position: relative; }
+        .modal-box h2 { margin-bottom: 16px; }
+        .modal-box h3 { margin: 20px 0 10px; font-size: 1em; color: #444; border-top: 1px solid #eee; padding-top: 16px; }
+        .modal-box h3:first-of-type { margin-top: 0; border-top: none; padding-top: 0; }
+        .modal-close { position: absolute; top: 14px; right: 16px; background: none; border: none; font-size: 1.4em; cursor: pointer; color: #666; width: auto; padding: 4px 8px; margin: 0; line-height: 1; }
+        .modal-close:hover { background: #f0f0f0; border-radius: 4px; }
+
+        /* Debug */
+        .debug-table { background: #1e1e1e; color: #d4d4d4; border-radius: 4px; padding: 10px; overflow-x: auto; font-family: monospace; font-size: 0.76em; line-height: 1.6; margin-top: 8px; }
+        .debug-step { display: flex; gap: 12px; border-bottom: 1px solid #333; padding: 3px 0; }
+        .debug-step:last-child { border-bottom: none; }
+        .debug-step-name { color: #9cdcfe; min-width: 160px; flex-shrink: 0; }
+        .debug-step-name.error { color: #f48771; }
+        .debug-step-body { color: #ce9178; word-break: break-all; }
+        .debug-step-body span.key { color: #9cdcfe; }
+        .debug-step-body span.val { color: #ce9178; }
+        .debug-step-body span.val.bool-true { color: #4ec9b0; }
+        .debug-step-body span.val.bool-false { color: #f48771; }
+        .debug-step-body span.val.num { color: #b5cea8; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Stuudium Tasks</h1>
+
+    <!-- Step 1: Password -->
+    <div id="stepPassword" class="box">
+        <h2>Enter Password</h2>
+        <form onsubmit="handlePassword(event)">
+            <input type="password" id="passwordInput" placeholder="Password" required>
+            <button type="submit" id="passwordBtn">Unlock</button>
+        </form>
+        <div id="passwordError" class="error hidden"></div>
+    </div>
+
+    <!-- Step 2: Token (first-time setup) -->
+    <div id="stepCookie" class="box hidden">
+        <h2>Stuudium Session Token</h2>
+        <div class="warning">
+            Your session token is sent to a Cloudflare Worker and never stored server-side. Paste your <code>_stdmss</code> cookie below.
+        </div>
+        <p style="margin-bottom:12px"><strong>How to find it:</strong></p>
+        <ol>
+            <li>Open <a href="https://jpg.ope.ee" target="_blank">jpg.ope.ee</a> and make sure you're logged in.</li>
+            <li>Press <code>F12</code> → <strong>Storage</strong> tab → <strong>Cookies</strong>.</li>
+            <li>Find the row named <code>_stdmss</code>.</li>
+            <li>Double-click the value and copy it.</li>
+            <li>Paste it below.</li>
+        </ol>
+        <br>
+        <input type="text" id="cookieInput" placeholder="Paste _stdmss value here">
+        <button onclick="saveCookie()">Save & Sync</button>
+        <button class="small" style="background:#6c757d;width:auto" onclick="skipCookie()">Use stored token</button>
+        <div id="cookieError" class="error hidden"></div>
+    </div>
+
+    <!-- Step 3: Tasks view -->
+    <div id="stepTasks" class="hidden">
+        <div class="toolbar">
+            <button class="green" onclick="syncTasks()">↻ Sync</button>
+            <button id="filterBtn" class="small" style="background:#007bff" onclick="toggleOldFilter()">Hide Done</button>
+            <button class="small" style="background:#6c757d" onclick="openSettings()">⚙ Settings</button>
+        </div>
+        <div id="syncStatus"></div>
+        <div id="tasksList"></div>
+    </div>
+</div>
+
+<!-- Settings modal -->
+<div id="settingsModal" class="modal-overlay hidden">
+    <div class="modal-box">
+        <button class="modal-close" onclick="closeSettings()">×</button>
+        <h2>Settings</h2>
+
+        <h3>Update Session Token</h3>
+        <div class="warning" style="margin-bottom:10px">
+            Paste a fresh <code>_stdmss</code> cookie value from <a href="https://jpg.ope.ee" target="_blank">jpg.ope.ee</a> DevTools → Storage → Cookies.
+        </div>
+        <input type="text" id="modalCookieInput" placeholder="Paste _stdmss value here">
+        <button onclick="saveModalToken()">Save & Sync</button>
+        <div id="modalTokenError" class="error hidden"></div>
+
+        <h3>Last Sync Debug</h3>
+        <div id="modalDebug"><p style="color:#999;font-size:0.85em">Sync once to see debug info.</p></div>
+    </div>
+</div>
+
+<script>
+    let allTasks = [];
+    let hideOld = false;
+    let lastDebugSteps = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+        const auth = sessionStorage.getItem('auth');
+        let token = localStorage.getItem('stuudium_token');
+
+        // Clear leftover URL-encoded tokens from before the cookie-name fix
+        if (token && token.includes('%')) {
+            localStorage.removeItem('stuudium_token');
+            localStorage.removeItem('stuudium_tasks');
+            token = null;
+        }
+
+        if (auth === 'ok') {
+            showTasksStep();
+            if (token) {
+                loadCachedTasks();
+            } else {
+                document.getElementById('syncStatus').innerHTML =
+                    '<div class="warning">No token set — click ⚙ Settings to add your <code>_stdmss</code> cookie.</div>';
+            }
+        }
+    });
+
+    // ── Auth ──────────────────────────────────────────────────────────────────
+
+    async function handlePassword(e) {
+        e.preventDefault();
+        const val = document.getElementById('passwordInput').value;
+        const errEl = document.getElementById('passwordError');
+        const btn = document.getElementById('passwordBtn');
+
+        errEl.classList.add('hidden');
+        btn.disabled = true;
+        btn.textContent = 'Checking…';
+
+        try {
+            const resp = await fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: val }),
+            });
+
+            if (resp.ok) {
+                sessionStorage.setItem('auth', 'ok');
+                showTasksStep();
+                const token = localStorage.getItem('stuudium_token');
+                if (token) { syncTasks(); }
+                else {
+                    document.getElementById('syncStatus').innerHTML =
+                        '<div class="warning">No token set — click ⚙ Settings to add your <code>_stdmss</code> cookie.</div>';
+                }
+            } else if (resp.status === 500) {
+                const data = await resp.json().catch(() => ({}));
+                showErr(errEl, 'Server error: ' + (data.error || resp.statusText));
+            } else {
+                showErr(errEl, 'Wrong password');
+            }
+        } catch (err) {
+            showErr(errEl, 'Auth failed: ' + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Unlock';
+        }
+    }
+
+    // ── Token setup step ──────────────────────────────────────────────────────
+
+    function saveCookie() {
+        const val = document.getElementById('cookieInput').value.trim();
+        if (!val) { showErr(document.getElementById('cookieError'), 'Paste your _stdmss value first'); return; }
+        localStorage.setItem('stuudium_token', val);
+        showTasksStep();
+        syncTasks();
+    }
+
+    function skipCookie() {
+        if (!localStorage.getItem('stuudium_token')) {
+            showErr(document.getElementById('cookieError'), 'No stored token found.');
+            return;
+        }
+        showTasksStep();
+        loadCachedTasks();
+    }
+
+    // ── Settings modal ────────────────────────────────────────────────────────
+
+    function openSettings() {
+        document.getElementById('modalCookieInput').value = '';
+        document.getElementById('modalTokenError').classList.add('hidden');
+        updateModalDebug();
+        document.getElementById('settingsModal').classList.remove('hidden');
+    }
+
+    function closeSettings() {
+        document.getElementById('settingsModal').classList.add('hidden');
+    }
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSettings(); });
+    document.getElementById('settingsModal')?.addEventListener('click', e => {
+        if (e.target === document.getElementById('settingsModal')) closeSettings();
+    });
+
+    function saveModalToken() {
+        const val = document.getElementById('modalCookieInput').value.trim();
+        if (!val) { showErr(document.getElementById('modalTokenError'), 'Paste your _stdmss value first'); return; }
+        localStorage.setItem('stuudium_token', val);
+        closeSettings();
+        syncTasks();
+    }
+
+    function updateModalDebug() {
+        const el = document.getElementById('modalDebug');
+        if (!lastDebugSteps) {
+            el.innerHTML = '<p style="color:#999;font-size:0.85em">Sync once to see debug info.</p>';
+            return;
+        }
+        el.innerHTML = buildDebugTable(lastDebugSteps);
+    }
+
+    // ── Step navigation ───────────────────────────────────────────────────────
+
+    function showCookieStep() {
+        document.getElementById('stepPassword').classList.add('hidden');
+        document.getElementById('stepCookie').classList.remove('hidden');
+        document.getElementById('stepTasks').classList.add('hidden');
+    }
+
+    function showTasksStep() {
+        document.getElementById('stepPassword').classList.add('hidden');
+        document.getElementById('stepCookie').classList.add('hidden');
+        document.getElementById('stepTasks').classList.remove('hidden');
+    }
+
+    // ── Sync ──────────────────────────────────────────────────────────────────
+
+    async function syncTasks() {
+        const status = document.getElementById('syncStatus');
+        const token = localStorage.getItem('stuudium_token');
+        if (!token) {
+            document.getElementById('syncStatus').innerHTML =
+                '<div class="warning">No token set — click ⚙ Settings to add your <code>_stdmss</code> cookie.</div>';
+            return;
+        }
+
+        status.innerHTML = '<div class="loading">Fetching from Stuudium…</div>';
+
+        let data = null;
+        try {
+            const resp = await fetch('/api/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token }),
+            });
+
+            let rawText = '';
+            try {
+                rawText = await resp.text();
+                data = JSON.parse(rawText);
+            } catch {
+                console.error('[sync] raw:', rawText.slice(0, 500));
+                throw new Error(`Non-JSON (HTTP ${resp.status}): ${rawText.slice(0, 200)}`);
+            }
+
+            console.log('[sync] status:', resp.status, '| tasks:', data.tasks?.length ?? 'n/a');
+            console.log('[sync] debug:', data.debug);
+
+            lastDebugSteps = data.debug || null;
+
+            if (resp.status === 401) {
+                status.innerHTML = '<div class="error">Session expired — click ⚙ Settings to update your token.</div>';
+                openSettings();
+                return;
+            }
+
+            if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
+
+            allTasks = data.tasks || [];
+            localStorage.setItem('stuudium_tasks', JSON.stringify(allTasks));
+            localStorage.setItem('stuudium_lastSync', new Date().toISOString());
+
+            renderTasks();
+            status.innerHTML = `<div class="info">Synced! Found ${allTasks.length} tasks.</div>`;
+
+        } catch (err) {
+            console.error('[sync error]', err);
+            lastDebugSteps = data?.debug || null;
+            status.innerHTML = `<div class="error">Sync failed: ${esc(err.message)}</div>`;
+            loadCachedTasks();
+        }
+    }
+
+    function loadCachedTasks() {
+        const cached = localStorage.getItem('stuudium_tasks');
+        if (cached) {
+            allTasks = JSON.parse(cached);
+            renderTasks();
+            const lastSync = localStorage.getItem('stuudium_lastSync');
+            if (lastSync) {
+                document.getElementById('syncStatus').innerHTML +=
+                    `<div class="last-sync">Last synced: ${new Date(lastSync).toLocaleString()}</div>`;
+            }
+        } else {
+            document.getElementById('syncStatus').innerHTML +=
+                '<div class="warning">No cached data — hit Sync.</div>';
+        }
+    }
+
+    // ── Filter ────────────────────────────────────────────────────────────────
+
+    function toggleOldFilter() {
+        hideOld = !hideOld;
+        const btn = document.getElementById('filterBtn');
+        btn.textContent = hideOld ? 'Show All' : 'Hide Done';
+        btn.style.background = hideOld ? '#6c757d' : '#007bff';
+        renderTasks();
+    }
+
+    // ── Render ────────────────────────────────────────────────────────────────
+
+    function renderTasks() {
+        const list = document.getElementById('tasksList');
+        const now = Math.floor(Date.now() / 1000);
+        const displayTasks = hideOld ? allTasks.filter(t => !t.completed) : allTasks;
+
+        if (!displayTasks.length) {
+            list.innerHTML = hideOld
+                ? '<p style="padding:20px;color:#28a745;font-weight:bold">All caught up! No pending tasks.</p>'
+                : '<p style="padding:20px;color:#666">No tasks found.</p>';
+            return;
+        }
+
+        list.innerHTML = displayTasks.map(task => {
+            const dateStr = task.date
+                ? new Date(parseInt(task.date) * 1000).toLocaleDateString('en-GB', {
+                    weekday: 'short', day: 'numeric', month: 'short'
+                  })
+                : 'No date';
+            const isOld = task.date && parseInt(task.date) < now;
+
+            return `<div class="task ${task.completed ? 'completed' : ''}">
+                <input type="checkbox" ${task.completed ? 'checked' : ''} disabled>
+                <div>
+                    <div class="task-title">${esc(task.description)}</div>
+                    <div class="task-meta">
+                        <span>📚 ${esc(task.subject)}</span>
+                        <span>📅 ${dateStr}${isOld ? ' · old' : ''}</span>
+                        ${task.duration ? `<span>⏱ ${esc(task.duration)}</span>` : ''}
+                        <span>${task.completed ? '✓ Done' : '· Pending'}</span>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // ── Debug table ───────────────────────────────────────────────────────────
+
+    function buildDebugTable(steps) {
+        if (!steps || !steps.length) return '<p style="color:#999;font-size:0.85em">No debug data.</p>';
+        const rows = steps.map(s => {
+            const { step, ...rest } = s;
+            const isErr = step && step.includes('error');
+            const pairs = Object.entries(rest).map(([k, v]) => {
+                let cls = 'val';
+                if (v === true) cls += ' bool-true';
+                else if (v === false) cls += ' bool-false';
+                else if (typeof v === 'number') cls += ' num';
+                return `<span class="key">${esc(k)}</span>: <span class="${cls}">${esc(JSON.stringify(v))}</span>`;
+            }).join('  ');
+            return `<div class="debug-step">
+                <span class="debug-step-name${isErr ? ' error' : ''}">${esc(step || '?')}</span>
+                <span class="debug-step-body">${pairs}</span>
+            </div>`;
+        }).join('');
+        return `<div class="debug-table">${rows}</div>`;
+    }
+
+    // ── Utils ─────────────────────────────────────────────────────────────────
+
+    function showErr(el, msg) {
+        el.textContent = msg;
+        el.classList.remove('hidden');
+    }
+
+    function esc(text) {
+        const d = document.createElement('div');
+        d.textContent = text == null ? '' : String(text);
+        return d.innerHTML;
+    }
+</script>
+</body>
+</html>

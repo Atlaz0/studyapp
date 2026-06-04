@@ -1,0 +1,6 @@
+.wrangler/
+.claude/
+node_modules/
+.env
+.env.*
+*.local
