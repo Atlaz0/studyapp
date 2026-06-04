@@ -4,50 +4,655 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stuudium Tasks</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg:        #0b0b0e;
+            --surf-1:    #111116;
+            --surf-2:    #18181f;
+            --surf-3:    #21212a;
+            --border:    #2b2b38;
+            --border-hi: #3c3c50;
+            --text:      #dddde8;
+            --text-2:    #8080a0;
+            --text-3:    #50506a;
+            --accent:    #e0753a;
+            --accent-lo: #5a2a10;
+            --green:     #3ecf7e;
+            --green-lo:  #0d3d22;
+            --red:       #f05858;
+            --red-lo:    #3d1010;
+            --yellow:    #e8b840;
+            --yellow-lo: #3d2e08;
+            --font:      'JetBrains Mono', monospace;
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: system-ui; background: #f5f5f5; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; }
-        h1 { margin-bottom: 20px; }
-        .box { background: white; padding: 20px; border-radius: 4px; margin-bottom: 20px; }
-        input[type="password"], input[type="text"] { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; }
-        button { width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 8px; }
-        button:hover { background: #0056b3; }
-        button:disabled { opacity: 0.6; cursor: not-allowed; }
-        button.green { background: #28a745; }
-        button.green:hover { background: #218838; }
-        button.small { width: auto; padding: 6px 12px; font-size: 0.85em; margin-bottom: 0; }
-        .error { background: #fee; padding: 12px; border: 1px solid #f00; border-radius: 4px; margin-bottom: 10px; color: #c00; }
-        .info { background: #efe; padding: 12px; border: 1px solid #0a0; border-radius: 4px; margin-bottom: 10px; color: #060; }
-        .warning { background: #fff3cd; padding: 12px; border: 1px solid #ffc107; border-radius: 4px; margin-bottom: 10px; color: #856404; }
-        .task { background: white; padding: 15px; margin-bottom: 10px; border-radius: 4px; border-left: 4px solid #007bff; display: flex; align-items: flex-start; gap: 10px; }
-        .task.completed { opacity: 0.5; border-left-color: #aaa; }
-        .task input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; opacity: 0.6; cursor: not-allowed; }
-        .task-title { font-weight: bold; margin-bottom: 4px; }
-        .task-meta { font-size: 0.85em; color: #666; }
-        .task-meta span { margin-right: 12px; }
-        .loading { text-align: center; padding: 20px; color: #666; }
-        .last-sync { font-size: 0.85em; color: #999; margin-bottom: 10px; }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+            font-size: 13px;
+        }
+
         .hidden { display: none !important; }
-        code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
-        ol { padding-left: 20px; line-height: 2; }
 
-        /* Toolbar */
-        .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-        .toolbar button.green { width: auto; padding: 8px 16px; margin-bottom: 0; }
+        /* ── Auth overlay ────────────────────────────────────────── */
 
-        /* Settings modal */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-        .modal-box { background: white; border-radius: 8px; padding: 24px; width: 90%; max-width: 640px; max-height: 88vh; overflow-y: auto; position: relative; }
-        .modal-box h2 { margin-bottom: 16px; }
-        .modal-box h3 { margin: 20px 0 10px; font-size: 1em; color: #444; border-top: 1px solid #eee; padding-top: 16px; }
+        .auth-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(11,11,14,0.97);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+        }
+
+        .auth-card {
+            background: var(--surf-2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 32px;
+            width: 340px;
+        }
+
+        .auth-logo {
+            font-size: 1.3em;
+            font-weight: 600;
+            letter-spacing: -0.03em;
+            color: var(--text);
+            margin-bottom: 20px;
+        }
+
+        .auth-hint {
+            font-size: 0.8em;
+            color: var(--text-2);
+            margin-bottom: 14px;
+            line-height: 1.6;
+        }
+
+        /* ── Main layout ─────────────────────────────────────────── */
+
+        .app-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            height: 100vh;
+            padding: 12px;
+        }
+
+        .panel-left {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 10px;
+            min-height: 0;
+        }
+
+        /* ── Shared panel base ───────────────────────────────────── */
+
+        .calendar-panel,
+        .task-create-panel,
+        .panel-right {
+            background: var(--surf-1);
+            border: 1px solid var(--accent-lo);
+            border-left: 2px solid var(--accent-lo);
+            border-radius: 8px;
+            padding: 14px;
+            min-height: 0;
+            overflow: hidden;
+            transition: border-color 0.12s;
+        }
+
+        .calendar-panel:hover,
+        .task-create-panel:hover,
+        .panel-right:hover { border-color: var(--accent); }
+
+        .panel-label {
+            font-size: 0.75em;
+            color: var(--text-3);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 10px;
+        }
+
+        /* ── Calendar panel ──────────────────────────────────────── */
+
+        .calendar-panel {
+            display: flex;
+            flex-direction: column;
+            align-self: start;
+        }
+
+        .cal-nav {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 14px;
+            flex-shrink: 0;
+        }
+
+        .cal-title {
+            flex: 1;
+            font-size: 0.9em;
+            font-weight: 600;
+            color: var(--text);
+            text-align: center;
+            letter-spacing: -0.02em;
+        }
+
+        .cal-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .cal-header-row {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            margin-bottom: 2px;
+        }
+
+        .cal-header-cell {
+            text-align: center;
+            font-size: 0.72em;
+            color: var(--text-3);
+            padding: 2px 0 6px;
+            letter-spacing: 0.04em;
+        }
+
+        .cal-header-cell.weekend { color: var(--text-3); opacity: 0.55; }
+
+        .cal-days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            grid-auto-rows: auto;
+            gap: 5px;
+        }
+
+        .cal-cell {
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding-top: 4px;
+            gap: 3px;
+            border: 1px solid var(--accent-lo);
+            border-left: 2px solid var(--accent-lo);
+            border-radius: 3px;
+            cursor: default;
+            transition: border-color 0.1s;
+        }
+
+        .cal-cell:not(.empty):not(.other-month):hover { border-color: var(--accent); }
+        .cal-cell.empty { pointer-events: none; border-color: transparent; }
+
+        .cal-cell.other-month {
+            border-color: var(--border);
+            border-left-color: var(--border);
+        }
+
+        .cal-cell.other-month:hover { border-color: var(--border-hi); }
+        .cal-cell.other-month .cal-num { color: var(--text-3); }
+
+        .cal-num {
+            width: 26px;
+            height: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-size: 0.82em;
+            color: var(--text-2);
+        }
+
+        .cal-cell.today .cal-num {
+            background: var(--accent);
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .cal-cell.weekend .cal-num { color: var(--text-3); }
+
+        .cal-dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: var(--accent);
+            opacity: 0.7;
+        }
+
+        /* ── Calendar popup ──────────────────────────────────────── */
+
+        .cal-popup {
+            position: fixed;
+            background: var(--surf-2);
+            border: 1px solid var(--border-hi);
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 0.78em;
+            z-index: 300;
+            min-width: 170px;
+            max-width: 240px;
+            max-height: 220px;
+            overflow-y: auto;
+            pointer-events: none;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+        }
+
+        .cal-popup-date {
+            font-size: 0.85em;
+            color: var(--text-3);
+            margin-bottom: 6px;
+            letter-spacing: 0.04em;
+        }
+
+        .cal-popup-task {
+            padding: 3px 0;
+            color: var(--text);
+            border-bottom: 1px solid var(--border);
+            line-height: 1.4;
+        }
+
+        .cal-popup-task:last-child { border-bottom: none; }
+        .cal-popup-task.done { color: var(--text-3); text-decoration: line-through; }
+        .cal-popup-task .subj { color: var(--text-3); }
+
+        /* ── Calendar stuudium toggle ─────────────────────────────── */
+
+        .cal-toggle {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.72em;
+            color: var(--text-3);
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .cal-toggle input { cursor: pointer; accent-color: var(--accent); }
+
+        /* ── Task creation panel ─────────────────────────────────── */
+
+        .task-create-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .task-form {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .local-tasks-list {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .local-tasks-list::-webkit-scrollbar { width: 2px; }
+        .local-tasks-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        .local-task-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.82em;
+        }
+
+        .local-task-row:last-child { border-bottom: none; }
+        .local-task-row.done .local-task-title { text-decoration: line-through; color: var(--text-3); }
+
+        .local-task-title { flex: 1; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .local-task-date { color: var(--text-3); flex-shrink: 0; font-size: 0.85em; }
+
+        /* ── Right panel ─────────────────────────────────────────── */
+
+        .panel-right {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .right-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-shrink: 0;
+        }
+
+        .panel-title {
+            font-size: 0.85em;
+            font-weight: 600;
+            color: var(--text);
+            flex: 1;
+            letter-spacing: -0.02em;
+        }
+
+        .toolbar-actions { display: flex; align-items: center; gap: 10px; }
+
+        .show-old-link {
+            font-size: 0.75em;
+            color: var(--text-3);
+            text-decoration: underline;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .show-old-link:hover { color: var(--text-2); }
+
+        #syncStatus { flex-shrink: 0; }
+
+        .tasks-scroll {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+            margin-top: 4px;
+        }
+
+        .tasks-scroll::-webkit-scrollbar { width: 3px; }
+        .tasks-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        /* ── Stuudium task cards ──────────────────────────────────── */
+
+        .task {
+            background: var(--surf-2);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .task.completed { border-left-color: var(--border-hi); }
+        .task.completed .task-title { text-decoration: line-through; color: var(--text-3); }
+        .task.completed .task-meta { color: var(--text-3); opacity: 0.7; }
+
+        .task input[type="checkbox"] {
+            flex-shrink: 0;
+            accent-color: var(--accent);
+            cursor: pointer;
+            margin-left: auto;
+        }
+
+        .task-title {
+            font-size: 0.85em;
+            font-weight: 500;
+            color: var(--text);
+            line-height: 1.4;
+            margin-top: 2px;
+        }
+
+        .task-meta {
+            font-size: 0.75em;
+            color: var(--text-2);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 10px;
+            margin-bottom: 2px;
+        }
+
+        /* ── Settings modal ──────────────────────────────────────── */
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-box {
+            background: var(--surf-2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            width: 90%;
+            max-width: 580px;
+            max-height: 85vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-box h2 {
+            font-size: 1em;
+            font-weight: 600;
+            margin-bottom: 18px;
+            color: var(--text);
+        }
+
+        .modal-box h3 {
+            font-size: 0.8em;
+            font-weight: 500;
+            color: var(--text-2);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin: 20px 0 10px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
         .modal-box h3:first-of-type { margin-top: 0; border-top: none; padding-top: 0; }
-        .modal-close { position: absolute; top: 14px; right: 16px; background: none; border: none; font-size: 1.4em; cursor: pointer; color: #666; width: auto; padding: 4px 8px; margin: 0; line-height: 1; }
-        .modal-close:hover { background: #f0f0f0; border-radius: 4px; }
 
-        /* Debug */
-        .debug-table { background: #1e1e1e; color: #d4d4d4; border-radius: 4px; padding: 10px; overflow-x: auto; font-family: monospace; font-size: 0.76em; line-height: 1.6; margin-top: 8px; }
-        .debug-step { display: flex; gap: 12px; border-bottom: 1px solid #333; padding: 3px 0; }
+        .modal-close {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            background: none;
+            border: none;
+            color: var(--text-2);
+            font-size: 1.2em;
+            cursor: pointer;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            margin: 0;
+            line-height: 1;
+        }
+
+        .modal-close:hover { background: var(--surf-3); color: var(--text); }
+
+        /* ── FAB ─────────────────────────────────────────────────── */
+
+        .fab {
+            position: fixed;
+            bottom: 18px;
+            right: 18px;
+            background: none;
+            border: none;
+            color: var(--text-3);
+            cursor: pointer;
+            z-index: 100;
+            padding: 4px;
+            transition: color 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .fab:hover { background: none; color: var(--text-2); }
+
+        /* ── Form inputs ─────────────────────────────────────────── */
+
+        input[type="text"],
+        input[type="password"],
+        input[type="date"],
+        input[type="time"] {
+            background: var(--surf-3);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            padding: 8px 10px;
+            font-family: var(--font);
+            font-size: 0.85em;
+            outline: none;
+            transition: border-color 0.12s;
+            width: 100%;
+        }
+
+        input[type="date"],
+        input[type="time"] { color-scheme: dark; }
+
+        input:focus { border-color: var(--accent); }
+
+        input::placeholder { color: var(--text-3); }
+
+        :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+        /* ── Buttons ─────────────────────────────────────────────── */
+
+        button {
+            font-family: var(--font);
+            font-size: 0.82em;
+            border-radius: 6px;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--surf-3);
+            color: var(--text-2);
+            padding: 7px 12px;
+            transition: background 0.12s, color 0.12s, border-color 0.12s;
+            white-space: nowrap;
+        }
+
+        button:hover { background: var(--border); color: var(--text); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-accent {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        .btn-accent:hover { filter: brightness(1.1); background: var(--accent); color: #fff; }
+
+        .btn-icon {
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .btn-delete {
+            background: none;
+            border: none;
+            color: var(--text-3);
+            padding: 0 4px;
+            font-size: 1em;
+            flex-shrink: 0;
+        }
+
+        .btn-delete:hover { color: var(--red); background: none; }
+
+        /* ── Status messages ─────────────────────────────────────── */
+
+        .msg-error {
+            background: var(--red-lo);
+            border: 1px solid var(--red);
+            color: var(--red);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.82em;
+            margin-bottom: 10px;
+        }
+
+        .msg-info {
+            background: var(--green-lo);
+            border: 1px solid var(--green);
+            color: var(--green);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.82em;
+            margin-bottom: 8px;
+        }
+
+        .msg-warning {
+            background: var(--yellow-lo);
+            border: 1px solid var(--yellow);
+            color: var(--yellow);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.82em;
+            margin-bottom: 8px;
+        }
+
+        .loading {
+            color: var(--text-3);
+            font-size: 0.82em;
+            padding: 8px 0;
+        }
+
+        .last-sync {
+            font-size: 0.78em;
+            color: var(--text-3);
+            margin-top: 4px;
+        }
+
+        .empty-state {
+            color: var(--text-3);
+            font-size: 0.82em;
+            padding: 20px 0;
+        }
+
+        .text-muted { color: var(--text-2); font-size: 0.82em; }
+
+        code {
+            background: var(--surf-3);
+            color: var(--accent);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-family: var(--font);
+            font-size: 0.9em;
+        }
+
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        ol { padding-left: 18px; line-height: 2; font-size: 0.85em; color: var(--text-2); }
+
+        /* ── Debug table ─────────────────────────────────────────── */
+
+        .debug-table {
+            background: #0d0d10;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px;
+            overflow-x: auto;
+            font-family: var(--font);
+            font-size: 0.72em;
+            line-height: 1.6;
+            margin-top: 8px;
+        }
+
+        .debug-step {
+            display: flex;
+            gap: 12px;
+            border-bottom: 1px solid #1e1e28;
+            padding: 3px 0;
+        }
+
         .debug-step:last-child { border-bottom: none; }
         .debug-step-name { color: #9cdcfe; min-width: 160px; flex-shrink: 0; }
         .debug-step-name.error { color: #f48771; }
@@ -60,77 +665,154 @@
     </style>
 </head>
 <body>
-<div class="container">
-    <h1>Stuudium Tasks</h1>
 
-    <!-- Step 1: Password -->
-    <div id="stepPassword" class="box">
-        <h2>Enter Password</h2>
-        <form onsubmit="handlePassword(event)">
-            <input type="password" id="passwordInput" placeholder="Password" required>
-            <button type="submit" id="passwordBtn">Unlock</button>
-        </form>
-        <div id="passwordError" class="error hidden"></div>
-    </div>
+<!-- ── Auth overlay ─────────────────────────────────────────────── -->
+<div id="authOverlay" class="auth-overlay">
+    <div class="auth-card">
+        <div class="auth-logo">Stuudium Tasks</div>
 
-    <!-- Step 2: Token (first-time setup) -->
-    <div id="stepCookie" class="box hidden">
-        <h2>Stuudium Session Token</h2>
-        <div class="warning">
-            Your session token is sent to a Cloudflare Worker and never stored server-side. Paste your <code>_stdmss</code> cookie below.
+        <div id="stepPassword">
+            <form onsubmit="handlePassword(event)">
+                <input type="password" id="passwordInput" placeholder="Password" required autocomplete="current-password" style="margin-bottom:10px">
+                <button type="submit" id="passwordBtn" class="btn-accent" style="width:100%">Unlock</button>
+            </form>
+            <div id="passwordError" class="msg-error hidden" style="margin-top:10px;margin-bottom:0"></div>
         </div>
-        <p style="margin-bottom:12px"><strong>How to find it:</strong></p>
-        <ol>
-            <li>Open <a href="https://jpg.ope.ee" target="_blank">jpg.ope.ee</a> and make sure you're logged in.</li>
-            <li>Press <code>F12</code> → <strong>Storage</strong> tab → <strong>Cookies</strong>.</li>
-            <li>Find the row named <code>_stdmss</code>.</li>
-            <li>Double-click the value and copy it.</li>
-            <li>Paste it below.</li>
-        </ol>
-        <br>
-        <input type="text" id="cookieInput" placeholder="Paste _stdmss value here">
-        <button onclick="saveCookie()">Save & Sync</button>
-        <button class="small" style="background:#6c757d;width:auto" onclick="skipCookie()">Use stored token</button>
-        <div id="cookieError" class="error hidden"></div>
-    </div>
 
-    <!-- Step 3: Tasks view -->
-    <div id="stepTasks" class="hidden">
-        <div class="toolbar">
-            <button class="green" onclick="syncTasks()">↻ Sync</button>
-            <button id="filterBtn" class="small" style="background:#007bff" onclick="toggleOldFilter()">Hide Done</button>
-            <button class="small" style="background:#6c757d" onclick="openSettings()">⚙ Settings</button>
-        </div>
-        <div id="syncStatus"></div>
-        <div id="tasksList"></div>
     </div>
 </div>
 
-<!-- Settings modal -->
+<!-- ── Main app layout ───────────────────────────────────────────── -->
+<div id="stepTasks" class="app-layout hidden">
+
+    <!-- Left panel -->
+    <div class="panel-left">
+
+        <!-- Calendar -->
+        <div class="calendar-panel">
+            <div class="cal-nav">
+                <button class="btn-icon" onclick="prevMonth()"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,2 4,6 8,10"/></svg></button>
+                <span id="calTitle" class="cal-title"></span>
+                <button class="btn-icon" onclick="nextMonth()"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,2 8,6 4,10"/></svg></button>
+                <button onclick="goToday()" style="padding:4px 8px;font-size:0.75em">Today</button>
+                <label class="cal-toggle">
+                    <input type="checkbox" id="showStuudiumToggle" onchange="toggleStuudiumCal()">
+                    Stuudium
+                </label>
+            </div>
+            <div class="cal-grid" id="calGrid"></div>
+        </div>
+
+        <!-- Task creation -->
+        <div class="task-create-panel">
+            <div class="panel-label">New task</div>
+            <div class="task-form">
+                <input type="text" id="newTaskTitle" placeholder="What needs to be done?" style="flex:1;width:auto">
+                <input type="date" id="newTaskDate" style="width:130px;flex-shrink:0">
+                <input type="time" id="newTaskTime" style="width:auto;flex-shrink:0">
+                <button class="btn-accent" onclick="addLocalTask()" style="flex-shrink:0;width:34px;height:34px;padding:0;font-size:1.2em">+</button>
+            </div>
+            <div id="localTasksList" class="local-tasks-list"></div>
+        </div>
+    </div>
+
+    <!-- Right panel -->
+    <div class="panel-right">
+        <div class="right-toolbar">
+            <span class="panel-title">Stuudium</span>
+            <div class="toolbar-actions">
+                <button class="btn-accent" onclick="syncTasks()">↻ Sync</button>
+                <span id="filterBtn" class="show-old-link" onclick="toggleOldFilter()"></span>
+            </div>
+        </div>
+        <div id="syncStatus"></div>
+        <div id="tasksList" class="tasks-scroll"></div>
+    </div>
+</div>
+
+<!-- ── Settings modal ───────────────────────────────────────────── -->
 <div id="settingsModal" class="modal-overlay hidden">
     <div class="modal-box">
         <button class="modal-close" onclick="closeSettings()">×</button>
         <h2>Settings</h2>
 
         <h3>Update Session Token</h3>
-        <div class="warning" style="margin-bottom:10px">
-            Paste a fresh <code>_stdmss</code> cookie value from <a href="https://jpg.ope.ee" target="_blank">jpg.ope.ee</a> DevTools → Storage → Cookies.
+        <div id="modalTokenWarning" class="msg-warning" style="margin-bottom:12px">
+            Paste a fresh <code>_stdmss</code> cookie from <a href="https://jpg.ope.ee" target="_blank">jpg.ope.ee</a> → DevTools → Storage → Cookies.
         </div>
-        <input type="text" id="modalCookieInput" placeholder="Paste _stdmss value here">
-        <button onclick="saveModalToken()">Save & Sync</button>
-        <div id="modalTokenError" class="error hidden"></div>
+        <div id="modalTokenStatus" class="hidden" style="font-size:0.75em;color:var(--text-3);margin-bottom:6px">Token saved</div>
+        <input type="text" id="modalCookieInput" placeholder="Paste _stdmss value here" style="margin-bottom:10px">
+        <button onclick="saveModalToken()" class="btn-accent" style="width:100%">Save &amp; Sync</button>
+        <div id="modalTokenError" class="msg-error hidden" style="margin-top:8px"></div>
+
+        <h3>Google Calendar</h3>
+        <div id="googleCalStatus" class="text-muted" style="margin-bottom:10px;font-size:0.82em">Checking…</div>
+        <div id="googleCalConnected" class="hidden">
+            <div class="msg-info" style="margin-bottom:10px">Connected to Google Calendar</div>
+            <button onclick="syncToGoogle(this)" class="btn-accent" style="width:100%;margin-bottom:6px">Sync local tasks → Calendar</button>
+            <button onclick="disconnectGoogle()" style="width:100%">Disconnect</button>
+            <div id="googleSyncResult" style="margin-top:8px"></div>
+        </div>
+        <div id="googleCalDisconnected" class="hidden">
+            <button onclick="connectGoogle()" class="btn-accent" style="width:100%">Connect Google Calendar</button>
+        </div>
 
         <h3>Last Sync Debug</h3>
-        <div id="modalDebug"><p style="color:#999;font-size:0.85em">Sync once to see debug info.</p></div>
+        <div id="modalDebug"><p class="text-muted">Sync once to see debug info.</p></div>
     </div>
 </div>
 
+<!-- ── Calendar hover popup ─────────────────────────────────────── -->
+<div id="calPopup" class="cal-popup hidden">
+    <div class="cal-popup-date"></div>
+    <div class="cal-popup-tasks"></div>
+</div>
+
+<!-- ── Settings FAB ─────────────────────────────────────────────── -->
+<button class="fab" onclick="openSettings()" title="Settings">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+</button>
+
 <script>
     let allTasks = [];
-    let hideOld = false;
+    let hideOld = true;
     let lastDebugSteps = null;
+    let localTasks = JSON.parse(localStorage.getItem('local_tasks') || '[]');
+    let stuudiumCompleted = new Set(JSON.parse(localStorage.getItem('stuudium_completed') || '[]'));
+    let currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    let showStuudiumOnCal = false;
 
     window.addEventListener('DOMContentLoaded', () => {
+        const tn = new Date();
+        document.getElementById('newTaskDate').value =
+            `${tn.getFullYear()}-${String(tn.getMonth()+1).padStart(2,'0')}-${String(tn.getDate()).padStart(2,'0')}`;
+        document.getElementById('newTaskTitle').addEventListener('keydown', e => {
+            if (e.key === 'Enter') addLocalTask();
+        });
+
+        // Delegated listener for Stuudium task checkboxes (survives innerHTML replacement)
+        document.getElementById('tasksList').addEventListener('change', e => {
+            const id = e.target.dataset.taskId;
+            if (id) toggleStuudiumTask(id);
+        });
+
+        // Calendar hover delegation on stable parent
+        const calGrid = document.getElementById('calGrid');
+        calGrid.addEventListener('mousemove', e => {
+            const cell = e.target.closest('.cal-cell:not(.empty)');
+            if (cell) showCalPopup(cell, e.clientX, e.clientY);
+            else hideCalPopup();
+        });
+        calGrid.addEventListener('mouseleave', hideCalPopup);
+
+        // Settings modal click-outside
+        document.getElementById('settingsModal').addEventListener('click', e => {
+            if (e.target === document.getElementById('settingsModal')) closeSettings();
+        });
+
         const auth = sessionStorage.getItem('auth');
         let token = localStorage.getItem('stuudium_token');
 
@@ -141,13 +823,22 @@
             token = null;
         }
 
+        renderCalendar();
+        renderLocalTasks();
+        updateFilterLink();
+
+        if (new URLSearchParams(location.search).get('google') === 'connected') {
+            history.replaceState(null, '', location.pathname);
+            if (auth === 'ok') { showTasksStep(); openSettings(); }
+        }
+
         if (auth === 'ok') {
             showTasksStep();
             if (token) {
                 loadCachedTasks();
             } else {
                 document.getElementById('syncStatus').innerHTML =
-                    '<div class="warning">No token set — click ⚙ Settings to add your <code>_stdmss</code> cookie.</div>';
+                    '<div class="msg-warning">No token set — open Settings to add your <code>_stdmss</code> cookie.</div>';
             }
         }
     });
@@ -173,12 +864,13 @@
 
             if (resp.ok) {
                 sessionStorage.setItem('auth', 'ok');
+                sessionStorage.setItem('app_pass', val);
                 showTasksStep();
                 const token = localStorage.getItem('stuudium_token');
                 if (token) { syncTasks(); }
                 else {
                     document.getElementById('syncStatus').innerHTML =
-                        '<div class="warning">No token set — click ⚙ Settings to add your <code>_stdmss</code> cookie.</div>';
+                        '<div class="msg-warning">No token set — open Settings to add your <code>_stdmss</code> cookie.</div>';
                 }
             } else if (resp.status === 500) {
                 const data = await resp.json().catch(() => ({}));
@@ -194,31 +886,27 @@
         }
     }
 
-    // ── Token setup step ──────────────────────────────────────────────────────
-
-    function saveCookie() {
-        const val = document.getElementById('cookieInput').value.trim();
-        if (!val) { showErr(document.getElementById('cookieError'), 'Paste your _stdmss value first'); return; }
-        localStorage.setItem('stuudium_token', val);
-        showTasksStep();
-        syncTasks();
-    }
-
-    function skipCookie() {
-        if (!localStorage.getItem('stuudium_token')) {
-            showErr(document.getElementById('cookieError'), 'No stored token found.');
-            return;
-        }
-        showTasksStep();
-        loadCachedTasks();
-    }
-
     // ── Settings modal ────────────────────────────────────────────────────────
 
     function openSettings() {
-        document.getElementById('modalCookieInput').value = '';
+        const token = localStorage.getItem('stuudium_token');
+        const input = document.getElementById('modalCookieInput');
+        const warning = document.getElementById('modalTokenWarning');
+
+        const status = document.getElementById('modalTokenStatus');
+        input.value = '';
+
+        if (token) {
+            warning.classList.add('hidden');
+            status.classList.remove('hidden');
+        } else {
+            warning.classList.remove('hidden');
+            status.classList.add('hidden');
+        }
+
         document.getElementById('modalTokenError').classList.add('hidden');
         updateModalDebug();
+        checkGoogleStatus();
         document.getElementById('settingsModal').classList.remove('hidden');
     }
 
@@ -227,9 +915,6 @@
     }
 
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSettings(); });
-    document.getElementById('settingsModal')?.addEventListener('click', e => {
-        if (e.target === document.getElementById('settingsModal')) closeSettings();
-    });
 
     function saveModalToken() {
         const val = document.getElementById('modalCookieInput').value.trim();
@@ -242,7 +927,7 @@
     function updateModalDebug() {
         const el = document.getElementById('modalDebug');
         if (!lastDebugSteps) {
-            el.innerHTML = '<p style="color:#999;font-size:0.85em">Sync once to see debug info.</p>';
+            el.innerHTML = '<p class="text-muted">Sync once to see debug info.</p>';
             return;
         }
         el.innerHTML = buildDebugTable(lastDebugSteps);
@@ -250,16 +935,11 @@
 
     // ── Step navigation ───────────────────────────────────────────────────────
 
-    function showCookieStep() {
-        document.getElementById('stepPassword').classList.add('hidden');
-        document.getElementById('stepCookie').classList.remove('hidden');
-        document.getElementById('stepTasks').classList.add('hidden');
-    }
-
     function showTasksStep() {
         document.getElementById('stepPassword').classList.add('hidden');
-        document.getElementById('stepCookie').classList.add('hidden');
         document.getElementById('stepTasks').classList.remove('hidden');
+        const overlay = document.getElementById('authOverlay');
+        if (overlay) overlay.classList.add('hidden');
     }
 
     // ── Sync ──────────────────────────────────────────────────────────────────
@@ -268,8 +948,7 @@
         const status = document.getElementById('syncStatus');
         const token = localStorage.getItem('stuudium_token');
         if (!token) {
-            document.getElementById('syncStatus').innerHTML =
-                '<div class="warning">No token set — click ⚙ Settings to add your <code>_stdmss</code> cookie.</div>';
+            status.innerHTML = '<div class="msg-warning">No token set — open Settings to add your <code>_stdmss</code> cookie.</div>';
             return;
         }
 
@@ -279,7 +958,10 @@
         try {
             const resp = await fetch('/api/sync', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-App-Token': sessionStorage.getItem('app_pass') || '',
+                },
                 body: JSON.stringify({ token }),
             });
 
@@ -298,7 +980,7 @@
             lastDebugSteps = data.debug || null;
 
             if (resp.status === 401) {
-                status.innerHTML = '<div class="error">Session expired — click ⚙ Settings to update your token.</div>';
+                status.innerHTML = '<div class="msg-error">Session expired — open Settings to update your token.</div>';
                 openSettings();
                 return;
             }
@@ -310,12 +992,13 @@
             localStorage.setItem('stuudium_lastSync', new Date().toISOString());
 
             renderTasks();
-            status.innerHTML = `<div class="info">Synced! Found ${allTasks.length} tasks.</div>`;
+            renderCalendar();
+            status.innerHTML = '';
 
         } catch (err) {
             console.error('[sync error]', err);
             lastDebugSteps = data?.debug || null;
-            status.innerHTML = `<div class="error">Sync failed: ${esc(err.message)}</div>`;
+            status.innerHTML = `<div class="msg-error">Sync failed: ${esc(err.message)}</div>`;
             loadCachedTasks();
         }
     }
@@ -325,14 +1008,15 @@
         if (cached) {
             allTasks = JSON.parse(cached);
             renderTasks();
+            renderCalendar();
             const lastSync = localStorage.getItem('stuudium_lastSync');
             if (lastSync) {
-                document.getElementById('syncStatus').innerHTML +=
-                    `<div class="last-sync">Last synced: ${new Date(lastSync).toLocaleString()}</div>`;
+                document.getElementById('syncStatus').insertAdjacentHTML('beforeend',
+                    `<div class="last-sync">Cached · ${new Date(lastSync).toLocaleString()}</div>`);
             }
         } else {
-            document.getElementById('syncStatus').innerHTML +=
-                '<div class="warning">No cached data — hit Sync.</div>';
+            document.getElementById('syncStatus').insertAdjacentHTML('beforeend',
+                '<div class="msg-warning">No cached data — hit Sync.</div>');
         }
     }
 
@@ -340,53 +1024,287 @@
 
     function toggleOldFilter() {
         hideOld = !hideOld;
-        const btn = document.getElementById('filterBtn');
-        btn.textContent = hideOld ? 'Show All' : 'Hide Done';
-        btn.style.background = hideOld ? '#6c757d' : '#007bff';
         renderTasks();
     }
 
-    // ── Render ────────────────────────────────────────────────────────────────
+    function updateFilterLink() {
+        const btn = document.getElementById('filterBtn');
+        if (!btn) return;
+        if (hideOld) {
+            const now = Math.floor(Date.now() / 1000);
+            const count = allTasks.filter(t =>
+                !stuudiumCompleted.has(t.id) && t.date && parseInt(t.date) < now
+            ).length;
+            btn.textContent = count > 0 ? `show old (${count})` : '';
+        } else {
+            btn.textContent = 'hide old';
+        }
+    }
+
+    // ── Render Stuudium tasks ─────────────────────────────────────────────────
 
     function renderTasks() {
         const list = document.getElementById('tasksList');
         const now = Math.floor(Date.now() / 1000);
-        const displayTasks = hideOld ? allTasks.filter(t => !t.completed) : allTasks;
+
+        const displayTasks = hideOld
+            ? allTasks.filter(t => stuudiumCompleted.has(t.id) || !(t.date && parseInt(t.date) < now))
+            : allTasks;
+
+        updateFilterLink();
 
         if (!displayTasks.length) {
-            list.innerHTML = hideOld
-                ? '<p style="padding:20px;color:#28a745;font-weight:bold">All caught up! No pending tasks.</p>'
-                : '<p style="padding:20px;color:#666">No tasks found.</p>';
+            list.innerHTML = '<p class="empty-state">No tasks.</p>';
             return;
         }
 
         list.innerHTML = displayTasks.map(task => {
+            const isCompleted = stuudiumCompleted.has(task.id);
             const dateStr = task.date
                 ? new Date(parseInt(task.date) * 1000).toLocaleDateString('en-GB', {
                     weekday: 'short', day: 'numeric', month: 'short'
                   })
                 : 'No date';
-            const isOld = task.date && parseInt(task.date) < now;
 
-            return `<div class="task ${task.completed ? 'completed' : ''}">
-                <input type="checkbox" ${task.completed ? 'checked' : ''} disabled>
-                <div>
-                    <div class="task-title">${esc(task.description)}</div>
+            return `<div class="task ${isCompleted ? 'completed' : ''}">
+                <div style="flex:1;min-width:0">
                     <div class="task-meta">
-                        <span>📚 ${esc(task.subject)}</span>
-                        <span>📅 ${dateStr}${isOld ? ' · old' : ''}</span>
-                        ${task.duration ? `<span>⏱ ${esc(task.duration)}</span>` : ''}
-                        <span>${task.completed ? '✓ Done' : '· Pending'}</span>
+                        <span>${esc(task.subject)}</span>
+                        <span>${dateStr}</span>
+                        ${task.duration ? `<span>${esc(task.duration)}</span>` : ''}
                     </div>
+                    <div class="task-title">${esc(task.description)}</div>
                 </div>
+                <input type="checkbox" data-task-id="${esc(task.id)}" ${isCompleted ? 'checked' : ''}>
             </div>`;
         }).join('');
+    }
+
+    function toggleStuudiumTask(id) {
+        if (stuudiumCompleted.has(id)) stuudiumCompleted.delete(id);
+        else stuudiumCompleted.add(id);
+        localStorage.setItem('stuudium_completed', JSON.stringify([...stuudiumCompleted]));
+        renderTasks();
+    }
+
+    // ── Local tasks ───────────────────────────────────────────────────────────
+
+    function saveLocalTasks() {
+        localStorage.setItem('local_tasks', JSON.stringify(localTasks));
+    }
+
+    function addLocalTask() {
+        const titleEl = document.getElementById('newTaskTitle');
+        const dateEl = document.getElementById('newTaskDate');
+        const timeEl = document.getElementById('newTaskTime');
+        const title = titleEl.value.trim();
+        if (!title) return;
+        const _n = new Date();
+        const localDate = `${_n.getFullYear()}-${String(_n.getMonth()+1).padStart(2,'0')}-${String(_n.getDate()).padStart(2,'0')}`;
+        const date = dateEl.value || localDate;
+        const time = timeEl.value || '';
+
+        localTasks.push({ id: Date.now().toString(), title, date, time, completed: false, created: Date.now() });
+        saveLocalTasks();
+        titleEl.value = '';
+        renderLocalTasks();
+        renderCalendar();
+    }
+
+    function toggleLocalTask(id) {
+        const t = localTasks.find(t => t.id === id);
+        if (t) { t.completed = !t.completed; saveLocalTasks(); renderLocalTasks(); }
+    }
+
+    function deleteLocalTask(id) {
+        localTasks = localTasks.filter(t => t.id !== id);
+        saveLocalTasks();
+        renderLocalTasks();
+        renderCalendar();
+    }
+
+    function renderLocalTasks() {
+        const el = document.getElementById('localTasksList');
+        if (!localTasks.length) {
+            el.innerHTML = '<p class="text-muted" style="padding:4px 0">No tasks yet.</p>';
+            return;
+        }
+        updateFilterLink();
+        const sorted = [...localTasks].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        el.innerHTML = sorted.map(t => `
+            <div class="local-task-row ${t.completed ? 'done' : ''}">
+                <input type="checkbox" ${t.completed ? 'checked' : ''} onchange="toggleLocalTask('${t.id}')">
+                <span class="local-task-title">${esc(t.title)}</span>
+                <span class="local-task-date">${formatShortDate(t.date)}${t.time ? ' · ' + t.time : ''}</span>
+                <button class="btn-delete" onclick="deleteLocalTask('${t.id}')" title="Delete">×</button>
+            </div>
+        `).join('');
+    }
+
+    // ── Stuudium-on-calendar toggle ───────────────────────────────────────────
+
+    function toggleStuudiumCal() {
+        showStuudiumOnCal = document.getElementById('showStuudiumToggle').checked;
+        renderCalendar();
+    }
+
+    // ── Calendar popup ────────────────────────────────────────────────────────
+
+    function showCalPopup(cell, mouseX, mouseY) {
+        const dateStr = cell.dataset.date;
+        if (!dateStr) return;
+
+        const dayTasks = [];
+        localTasks.forEach(t => {
+            if (t.date === dateStr) dayTasks.push({ type: 'local', title: t.title, time: t.time || '', completed: t.completed });
+        });
+        allTasks.forEach(t => {
+            if (!t.date) return;
+            if (unixToLocalDate(t.date) === dateStr) {
+                dayTasks.push({ type: 'stuudium', title: t.description, subject: t.subject, completed: stuudiumCompleted.has(t.id) });
+            }
+        });
+
+        const popup = document.getElementById('calPopup');
+        if (!dayTasks.length) { popup.classList.add('hidden'); return; }
+
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(y, m - 1, d).getDay()];
+        const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1];
+        popup.querySelector('.cal-popup-date').textContent = `${dow}, ${d} ${mo}`;
+        popup.querySelector('.cal-popup-tasks').innerHTML = dayTasks.map(t => {
+            const timeStr = t.time ? `<span class="subj"> · ${esc(t.time)}</span>` : '';
+            const subjStr = t.subject ? `<span class="subj">${esc(t.subject)} · </span>` : '';
+            return `<div class="cal-popup-task ${t.completed ? 'done' : ''}">${subjStr}${esc(t.title)}${timeStr}</div>`;
+        }).join('');
+
+        // Position near cursor, clamp using actual rendered dimensions
+        popup.style.visibility = 'hidden';
+        popup.style.left = (mouseX + 12) + 'px';
+        popup.style.top = (mouseY + 12) + 'px';
+        popup.classList.remove('hidden');
+        const rect = popup.getBoundingClientRect();
+        if (rect.right > window.innerWidth - 8) popup.style.left = (mouseX - rect.width - 8) + 'px';
+        if (rect.bottom > window.innerHeight - 8) popup.style.top = (mouseY - rect.height - 8) + 'px';
+        popup.style.visibility = '';
+    }
+
+    function hideCalPopup() {
+        document.getElementById('calPopup')?.classList.add('hidden');
+    }
+
+    // ── Calendar ──────────────────────────────────────────────────────────────
+
+    function prevMonth() {
+        currentMonthStart = new Date(currentMonthStart.getFullYear(), currentMonthStart.getMonth() - 1, 1);
+        renderCalendar();
+    }
+
+    function nextMonth() {
+        currentMonthStart = new Date(currentMonthStart.getFullYear(), currentMonthStart.getMonth() + 1, 1);
+        renderCalendar();
+    }
+
+    function goToday() {
+        currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        renderCalendar();
+    }
+
+    function unixToLocalDate(unixSeconds) {
+        const d = new Date(parseInt(unixSeconds) * 1000);
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    function formatShortDate(dateStr) {
+        if (!dateStr) return '';
+        const parts = dateStr.split('-');
+        if (parts.length < 3) return dateStr;
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return `${parseInt(parts[2])} ${months[parseInt(parts[1]) - 1] || ''}`;
+    }
+
+    function renderCalendar() {
+        const grid = document.getElementById('calGrid');
+        const titleEl = document.getElementById('calTitle');
+        if (!grid) return;
+
+        const _td = new Date();
+        const todayStr = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`;
+        const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        const DAY_NAMES = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+
+        const year = currentMonthStart.getFullYear();
+        const month = currentMonthStart.getMonth();
+        titleEl.textContent = `${MONTHS[month]} ${year}`;
+
+        // Offset: Mon=0 … Sun=6
+        const firstDow = new Date(year, month, 1).getDay();
+        const offset = firstDow === 0 ? 6 : firstDow - 1;
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        // Build dot sets: local tasks always, Stuudium tasks only if toggle is on
+        const localDays = new Set();
+        const stuudiumDays = new Set();
+        localTasks.forEach(t => {
+            const [ty, tm, td] = t.date.split('-').map(Number);
+            if (ty === year && tm - 1 === month) localDays.add(td);
+        });
+        if (showStuudiumOnCal) {
+            allTasks.forEach(t => {
+                if (!t.date) return;
+                const ds = unixToLocalDate(t.date);
+                const [ty, tm, td] = ds.split('-').map(Number);
+                if (ty === year && tm - 1 === month) stuudiumDays.add(td);
+            });
+        }
+
+        const headers = DAY_NAMES.map((d, i) =>
+            `<div class="cal-header-cell ${i >= 5 ? 'weekend' : ''}">${d}</div>`
+        ).join('');
+
+        // Previous month overflow
+        const prevYear = month === 0 ? year - 1 : year;
+        const prevMonthIdx = month === 0 ? 11 : month - 1;
+        const prevMonthLastDay = new Date(year, month, 0).getDate();
+        const prevCells = Array.from({ length: offset }, (_, i) => {
+            const day = prevMonthLastDay - offset + 1 + i;
+            const ds = `${prevYear}-${String(prevMonthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            return `<div class="cal-cell other-month" data-date="${ds}"><span class="cal-num">${day}</span></div>`;
+        }).join('');
+
+        // Current month cells
+        const dayCells = Array.from({ length: daysInMonth }, (_, i) => {
+            const day = i + 1;
+            const dow = (offset + i) % 7;
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const isToday = dateStr === todayStr;
+            const isWeekend = dow >= 5;
+            const dots = (localDays.has(day) ? '<span class="cal-dot"></span>' : '') +
+                          (stuudiumDays.has(day) ? '<span class="cal-dot" style="background:var(--text-3)"></span>' : '');
+            return `<div class="cal-cell ${isToday ? 'today' : ''} ${isWeekend ? 'weekend' : ''}" data-date="${dateStr}">
+                <span class="cal-num">${day}</span>
+                ${dots ? `<div style="display:flex;gap:2px">${dots}</div>` : ''}
+            </div>`;
+        }).join('');
+
+        // Next month overflow to complete the last row
+        const totalUsed = offset + daysInMonth;
+        const nextOverflow = totalUsed % 7 === 0 ? 0 : 7 - (totalUsed % 7);
+        const nextYear = month === 11 ? year + 1 : year;
+        const nextMonthIdx = month === 11 ? 0 : month + 1;
+        const nextCells = Array.from({ length: nextOverflow }, (_, i) => {
+            const day = i + 1;
+            const ds = `${nextYear}-${String(nextMonthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            return `<div class="cal-cell other-month" data-date="${ds}"><span class="cal-num">${day}</span></div>`;
+        }).join('');
+
+        grid.innerHTML = `<div class="cal-header-row">${headers}</div><div class="cal-days-grid">${prevCells}${dayCells}${nextCells}</div>`;
     }
 
     // ── Debug table ───────────────────────────────────────────────────────────
 
     function buildDebugTable(steps) {
-        if (!steps || !steps.length) return '<p style="color:#999;font-size:0.85em">No debug data.</p>';
+        if (!steps || !steps.length) return '<p class="text-muted">No debug data.</p>';
         const rows = steps.map(s => {
             const { step, ...rest } = s;
             const isErr = step && step.includes('error');
@@ -403,6 +1321,79 @@
             </div>`;
         }).join('');
         return `<div class="debug-table">${rows}</div>`;
+    }
+
+    // ── Google Calendar ───────────────────────────────────────────────────────
+
+    async function checkGoogleStatus() {
+        const statusEl = document.getElementById('googleCalStatus');
+        const connectedEl = document.getElementById('googleCalConnected');
+        const disconnectedEl = document.getElementById('googleCalDisconnected');
+        try {
+            const resp = await fetch('/api/google-status', {
+                headers: { 'X-App-Token': sessionStorage.getItem('app_pass') || '' },
+            });
+            const data = await resp.json();
+            statusEl.classList.add('hidden');
+            if (data.reason === 'not_configured') {
+                statusEl.textContent = 'Google OAuth not configured (see setup steps).';
+                statusEl.classList.remove('hidden');
+                disconnectedEl.classList.add('hidden');
+                connectedEl.classList.add('hidden');
+            } else if (data.connected) {
+                connectedEl.classList.remove('hidden');
+                disconnectedEl.classList.add('hidden');
+            } else {
+                connectedEl.classList.add('hidden');
+                disconnectedEl.classList.remove('hidden');
+            }
+        } catch {
+            statusEl.textContent = 'Could not check Google status.';
+        }
+    }
+
+    function connectGoogle() {
+        window.location.href = '/api/google-auth';
+    }
+
+    async function syncToGoogle(btn) {
+        const resultEl = document.getElementById('googleSyncResult');
+        const prev = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Syncing…';
+        resultEl.innerHTML = '';
+        try {
+            const resp = await fetch('/api/google-sync', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-App-Token': sessionStorage.getItem('app_pass') || '',
+                },
+                body: JSON.stringify({ tasks: localTasks }),
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+            const parts = [];
+            if (data.created) parts.push(`${data.created} created`);
+            if (data.updated) parts.push(`${data.updated} updated`);
+            if (data.errors) parts.push(`${data.errors} errors`);
+            resultEl.innerHTML = `<div class="msg-info">${parts.join(', ') || 'Nothing to sync'}</div>`;
+        } catch (err) {
+            resultEl.innerHTML = `<div class="msg-error">Sync failed: ${esc(err.message)}</div>`;
+        } finally {
+            btn.disabled = false;
+            btn.textContent = prev;
+        }
+    }
+
+    async function disconnectGoogle() {
+        if (!confirm('Disconnect Google Calendar? Stored tokens will be removed.')) return;
+        await fetch('/api/google-disconnect', {
+            method: 'POST',
+            headers: { 'X-App-Token': sessionStorage.getItem('app_pass') || '' },
+        });
+        document.getElementById('googleSyncResult').innerHTML = '';
+        checkGoogleStatus();
     }
 
     // ── Utils ─────────────────────────────────────────────────────────────────
