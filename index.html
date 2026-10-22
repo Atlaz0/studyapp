@@ -738,7 +738,7 @@
 
         <h3>Update Session Token</h3>
         <div id="modalTokenWarning" class="msg-warning" style="margin-bottom:12px">
-            Paste a fresh <code>_stdmss</code> cookie from <a href="https://jpg.ope.ee" target="_blank">jpg.ope.ee</a> → DevTools → Storage → Cookies.
+            No session stored. The Firefox extension sends it automatically when you log in to Stuudium. Manual fallback: paste a fresh <code>_stdmss</code> cookie from <a href="https://jpg.ope.ee" target="_blank">jpg.ope.ee</a> → DevTools → Storage → Cookies.
         </div>
         <div id="modalTokenStatus" class="hidden" style="font-size:0.75em;color:var(--text-3);margin-bottom:6px">Token saved</div>
         <input type="text" id="modalCookieInput" placeholder="Paste _stdmss value here" style="margin-bottom:10px">
@@ -814,14 +814,6 @@
         });
 
         const auth = sessionStorage.getItem('auth');
-        let token = localStorage.getItem('stuudium_token');
-
-        // Clear leftover URL-encoded tokens from before the cookie-name fix
-        if (token && token.includes('%')) {
-            localStorage.removeItem('stuudium_token');
-            localStorage.removeItem('stuudium_tasks');
-            token = null;
-        }
 
         renderCalendar();
         renderLocalTasks();
@@ -834,12 +826,8 @@
 
         if (auth === 'ok') {
             showTasksStep();
-            if (token) {
-                loadCachedTasks();
-            } else {
-                document.getElementById('syncStatus').innerHTML =
-                    '<div class="msg-warning">No token set — open Settings to add your <code>_stdmss</code> cookie.</div>';
-            }
+            loadCachedTasks();
+            migrateLocalToken();
         }
     });
 
@@ -866,12 +854,8 @@
                 sessionStorage.setItem('auth', 'ok');
                 sessionStorage.setItem('app_pass', val);
                 showTasksStep();
-                const token = localStorage.getItem('stuudium_token');
-                if (token) { syncTasks(); }
-                else {
-                    document.getElementById('syncStatus').innerHTML =
-                        '<div class="msg-warning">No token set — open Settings to add your <code>_stdmss</code> cookie.</div>';
-                }
+                await migrateLocalToken();
+                syncTasks();
             } else if (resp.status === 500) {
                 const data = await resp.json().catch(() => ({}));
                 showErr(errEl, 'Server error: ' + (data.error || resp.statusText));
@@ -888,21 +872,46 @@
 
     // ── Settings modal ────────────────────────────────────────────────────────
 
-    function openSettings() {
-        const token = localStorage.getItem('stuudium_token');
-        const input = document.getElementById('modalCookieInput');
+    function appHeaders() {
+        return { 'Content-Type': 'application/json', 'X-App-Token': sessionStorage.getItem('app_pass') || '' };
+    }
+
+    // Older versions kept the cookie in localStorage; hand it to the server once.
+    async function migrateLocalToken() {
+        const old = localStorage.getItem('stuudium_token');
+        if (!old) return;
+        try {
+            const r = await fetch('/api/token', {
+                method: 'POST', headers: appHeaders(),
+                body: JSON.stringify({ token: old, device: 'manual' }),
+            });
+            if (r.ok || r.status === 422) localStorage.removeItem('stuudium_token');
+        } catch (_) { /* try again next load */ }
+    }
+
+    async function refreshTokenStatus() {
         const warning = document.getElementById('modalTokenWarning');
-
         const status = document.getElementById('modalTokenStatus');
-        input.value = '';
+        try {
+            const r = await fetch('/api/token', { headers: appHeaders() });
+            const d = await r.json();
+            if (r.ok && d.count > 0) {
+                status.textContent = 'Stored sessions: ' + d.sessions
+                    .map(x => x.device + ' (' + new Date(x.updated_at * 1000).toLocaleString() + ')')
+                    .join(', ');
+                warning.classList.add('hidden');
+                status.classList.remove('hidden');
+                return;
+            }
+        } catch (_) { /* fall through to the warning */ }
+        warning.classList.remove('hidden');
+        status.classList.add('hidden');
+    }
 
-        if (token) {
-            warning.classList.add('hidden');
-            status.classList.remove('hidden');
-        } else {
-            warning.classList.remove('hidden');
-            status.classList.add('hidden');
-        }
+    function openSettings() {
+        const input = document.getElementById('modalCookieInput');
+        input.value = '';
+        refreshTokenStatus();
 
         document.getElementById('modalTokenError').classList.add('hidden');
         updateModalDebug();
@@ -916,10 +925,18 @@
 
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSettings(); });
 
-    function saveModalToken() {
+    async function saveModalToken() {
         const val = document.getElementById('modalCookieInput').value.trim();
-        if (!val) { showErr(document.getElementById('modalTokenError'), 'Paste your _stdmss value first'); return; }
-        localStorage.setItem('stuudium_token', val);
+        const errEl = document.getElementById('modalTokenError');
+        if (!val) { showErr(errEl, 'Paste your _stdmss value first'); return; }
+        try {
+            const r = await fetch('/api/token', {
+                method: 'POST', headers: appHeaders(),
+                body: JSON.stringify({ token: val, device: 'manual' }),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) { showErr(errEl, d.error || ('HTTP ' + r.status)); return; }
+        } catch (err) { showErr(errEl, 'Save failed: ' + err.message); return; }
         closeSettings();
         syncTasks();
     }
@@ -946,11 +963,6 @@
 
     async function syncTasks() {
         const status = document.getElementById('syncStatus');
-        const token = localStorage.getItem('stuudium_token');
-        if (!token) {
-            status.innerHTML = '<div class="msg-warning">No token set — open Settings to add your <code>_stdmss</code> cookie.</div>';
-            return;
-        }
 
         status.innerHTML = '<div class="loading">Fetching from Stuudium…</div>';
 
@@ -962,7 +974,7 @@
                     'Content-Type': 'application/json',
                     'X-App-Token': sessionStorage.getItem('app_pass') || '',
                 },
-                body: JSON.stringify({ token }),
+                body: JSON.stringify({}),
             });
 
             let rawText = '';
@@ -979,8 +991,19 @@
 
             lastDebugSteps = data.debug || null;
 
+            if (data.code === 'no_token') {
+                status.innerHTML = '<div class="msg-warning">No Stuudium session yet. Log in to Stuudium in Firefox (with the extension installed) or paste a cookie in Settings.</div>';
+                loadCachedTasks();
+                return;
+            }
+
+            if (resp.status === 403) {
+                status.innerHTML = '<div class="msg-error">App password rejected — reload and unlock again.</div>';
+                return;
+            }
+
             if (resp.status === 401) {
-                status.innerHTML = '<div class="msg-error">Session expired — open Settings to update your token.</div>';
+                status.innerHTML = '<div class="msg-error">Session expired. Log in to Stuudium again in Firefox (the extension sends the new cookie), or paste one in Settings.</div>';
                 openSettings();
                 return;
             }

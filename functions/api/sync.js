@@ -1,9 +1,15 @@
+import { BASE_URL, BROWSER_HEADERS, cleanToken, looksLikeAuthPage } from '../_lib/session.js';
+
 export async function onRequest(context) {
     if (context.request.method !== 'POST') {
         return json({ error: 'Method Not Allowed', debug: [] }, 405);
     }
+    if (!isAuthorized(context)) {
+        return json({ error: 'Unauthorized', debug: [] }, 403);
+    }
 
     const debug = [];
+    const { DB } = context.env;
 
     let body;
     try {
@@ -12,51 +18,64 @@ export async function onRequest(context) {
         return json({ error: 'Failed to parse request body: ' + err.message, debug }, 400);
     }
 
-    const { token } = body;
-    if (!token) {
-        return json({ error: 'No session token provided', debug }, 400);
+    // Candidate cookies: one pasted in the request (manual fallback), then every
+    // stored device session, newest first.
+    const candidates = [];
+    if (body.token) candidates.push({ token: cleanToken(body.token), device: 'manual-paste', stored: false });
+    if (DB) {
+        try {
+            const rows = await DB.prepare('SELECT token, device FROM stuudium_sessions ORDER BY updated_at DESC').all();
+            for (const r of rows.results) {
+                if (!candidates.some(c => c.token === r.token)) {
+                    candidates.push({ token: r.token, device: r.device, stored: true });
+                }
+            }
+        } catch (err) {
+            debug.push({ step: 'db_error', error: err.message });
+        }
     }
 
-    let cleanToken = token.trim();
-    if ((cleanToken.startsWith('"') && cleanToken.endsWith('"')) ||
-        (cleanToken.startsWith("'") && cleanToken.endsWith("'"))) {
-        cleanToken = cleanToken.slice(1, -1);
-    } else if (cleanToken.endsWith('"') || cleanToken.endsWith("'")) {
-        cleanToken = cleanToken.slice(0, -1);
+    if (candidates.length === 0) {
+        return json({ error: 'No session token yet', code: 'no_token', debug }, 400);
     }
 
-    if (cleanToken.includes('%')) {
-        try { cleanToken = decodeURIComponent(cleanToken); } catch (_) {}
-    }
+    const baseUrl = BASE_URL;
 
-    debug.push({ step: 'token', length: cleanToken.length, preview: `${cleanToken.slice(0, 12)}…${cleanToken.slice(-6)}` });
-
-    const baseUrl = 'https://jpg.ope.ee';
-    const headers = {
-        'Cookie': `_stdmss=${cleanToken}`,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'et-EE,et;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Referer': 'https://jpg.ope.ee/',
-    };
-
-    // 1. Fetch the dashboard page (redirects to /s/{id})
+    // 1. Fetch the dashboard page (redirects to /s/{id}) with the first cookie that still works
+    let headers = null;
     let mainHtml = '';
     let pageUrl = `${baseUrl}/dashboard`;
-    try {
-        const resp = await fetch(`${baseUrl}/dashboard`, { headers, redirect: 'follow' });
-        mainHtml = await resp.text();
-        pageUrl = resp.url;
+    let lastError = null;
 
-        const isAuthPage = resp.url.includes('/auth') || resp.url.includes('/login') || mainHtml.includes('Sisene');
-        debug.push({ step: 'dashboard', status: resp.status, finalUrl: resp.url, htmlLength: mainHtml.length, isAuthPage });
+    for (const c of candidates) {
+        const h = { ...BROWSER_HEADERS, 'Cookie': `_stdmss=${c.token}` };
+        debug.push({ step: 'token', device: c.device, length: c.token.length, preview: `${c.token.slice(0, 12)}…${c.token.slice(-6)}` });
+        try {
+            const resp = await fetch(`${baseUrl}/dashboard`, { headers: h, redirect: 'follow' });
+            const html = await resp.text();
+            const isAuthPage = looksLikeAuthPage(resp.url, html);
+            debug.push({ step: 'dashboard', status: resp.status, finalUrl: resp.url, htmlLength: html.length, isAuthPage });
 
-        if (isAuthPage) {
-            return json({ error: 'Session expired — please update your token', debug }, 401);
+            if (isAuthPage) {
+                // dead cookie: forget it so we do not retry it every sync
+                if (c.stored && DB) {
+                    await DB.prepare('DELETE FROM stuudium_sessions WHERE token = ?').bind(c.token).run().catch(() => {});
+                }
+                continue;
+            }
+            headers = h;
+            mainHtml = html;
+            pageUrl = resp.url;
+            break;
+        } catch (err) {
+            debug.push({ step: 'dashboard_error', error: err.message });
+            lastError = err;
         }
-    } catch (err) {
-        debug.push({ step: 'dashboard_error', error: err.message });
-        return json({ error: 'Failed to reach dashboard: ' + err.message, debug }, 500);
+    }
+
+    if (!headers) {
+        if (lastError) return json({ error: 'Failed to reach dashboard: ' + lastError.message, debug }, 500);
+        return json({ error: 'Session expired — please update your token', debug }, 401);
     }
 
     // 2. Find all data-action="load-older" links in the main HTML.
@@ -217,4 +236,9 @@ function json(data, status = 200) {
         status,
         headers: { 'Content-Type': 'application/json' },
     });
+}
+
+function isAuthorized(context) {
+    const token = context.request.headers.get('X-App-Token');
+    return context.env.PASSWORD && token === context.env.PASSWORD;
 }
