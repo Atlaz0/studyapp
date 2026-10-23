@@ -12,7 +12,7 @@ export async function onRequest(context) {
         client_id: GOOGLE_CLIENT_ID,
         redirect_uri: redirectUri,
         response_type: 'code',
-        scope: 'https://www.googleapis.com/auth/calendar.events',
+        scope: 'https://www.googleapis.com/auth/calendar.events.readonly',
         access_type: 'offline',
         prompt: 'consent',
         state,

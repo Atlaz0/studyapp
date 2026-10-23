@@ -6,6 +6,17 @@ export async function onRequest(context) {
 
     const { DB } = context.env;
     if (!DB) return json({ error: 'D1 not configured' }, 500);
+    // Revoke the grant at Google too (best effort), so no old permission lingers in your Google account.
+    try {
+        const row = await DB.prepare('SELECT refresh_token FROM google_tokens WHERE id = 1').first();
+        if (row?.refresh_token) {
+            await fetch('https://oauth2.googleapis.com/revoke', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ token: row.refresh_token }),
+            });
+        }
+    } catch { /* ignore: tokens are removed below either way */ }
     await DB.prepare('DELETE FROM google_tokens WHERE id = 1').run();
     await DB.prepare('DELETE FROM calendar_events').run();
     await DB.prepare('DELETE FROM calendar_event_state').run().catch(() => {});

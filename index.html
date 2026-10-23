@@ -852,8 +852,8 @@
         <h3>Google Calendar</h3>
         <div id="googleCalStatus" class="text-muted" style="margin-bottom:10px;font-size:0.82em">Checking…</div>
         <div id="googleCalConnected" class="hidden">
-            <div class="msg-info" style="margin-bottom:10px">Connected. Your Google events show in the calendar here. Nothing from this app is sent to Google.</div>
-            <button onclick="removePushedEvents(this)" style="width:100%;margin-bottom:6px">Remove events this app added earlier</button>
+            <div class="msg-info" style="margin-bottom:10px">Connected (read only). Your Google events show in the calendar here. This app cannot change your Google Calendar.</div>
+            <button id="cleanupBtn" class="hidden" onclick="removePushedEvents(this)" style="width:100%;margin-bottom:6px">Remove events this app added earlier</button>
             <button onclick="disconnectGoogle()" style="width:100%">Disconnect</button>
             <div id="googleSyncResult" style="margin-top:8px"></div>
         </div>
@@ -879,6 +879,7 @@
     let lastDebugSteps = null;
     let localTasks = JSON.parse(localStorage.getItem('local_tasks') || '[]');
     let googleConnected = null;
+    let googlePushed = 0;            // leftover events this app created in Google earlier
     let selectedDate = null;          // 'YYYY-MM-DD' shown in the day panel (default today)
     let googleEvents = [];            // expanded Google events: { id, title, date, time }
     const googleLoaded = new Set();   // months already fetched from Google
@@ -1468,6 +1469,9 @@
             });
             const data = await resp.json();
             googleConnected = !!data.connected;
+            googlePushed = data.pushed || 0;
+            const cleanupBtn = document.getElementById('cleanupBtn');
+            if (cleanupBtn) cleanupBtn.classList.toggle('hidden', !googlePushed);
             statusEl.classList.add('hidden');
             if (data.reason === 'not_configured') {
                 statusEl.textContent = 'Google OAuth not configured (see setup steps).';
@@ -1514,6 +1518,7 @@
             resultEl.innerHTML = html;
             googleLoaded.clear();
             loadGoogleEvents(true);
+            checkGoogleStatus();
         } catch (err) {
             resultEl.innerHTML = `<div class="msg-error">Cleanup failed: ${esc(err.message)}</div>`;
         } finally {
@@ -1523,7 +1528,10 @@
     }
 
     async function disconnectGoogle() {
-        if (!confirm('Disconnect Google Calendar? Stored tokens will be removed.')) return;
+        const warn = googlePushed
+            ? `${googlePushed} events this app added to your Google Calendar earlier are still there.\nUse "Remove events this app added earlier" first, because after reconnecting (read only) they can no longer be removed here.\n\nDisconnect anyway?`
+            : 'Disconnect Google Calendar? Stored tokens will be removed.';
+        if (!confirm(warn)) return;
         await fetch('/api/google-disconnect', {
             method: 'POST',
             headers: { 'X-App-Token': sessionStorage.getItem('app_pass') || '' },

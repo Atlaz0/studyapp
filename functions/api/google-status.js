@@ -6,7 +6,12 @@ export async function onRequest(context) {
     if (!DB) return json({ connected: false, reason: 'no_db' });
     try {
         const row = await DB.prepare('SELECT id FROM google_tokens WHERE id = 1').first();
-        return json({ connected: !!row });
+        let pushed = 0;
+        try {
+            const left = await DB.prepare('SELECT COUNT(*) AS n FROM calendar_events').first();
+            pushed = left?.n ?? 0;
+        } catch { /* table missing: nothing was ever pushed */ }
+        return json({ connected: !!row, pushed });
     } catch {
         return json({ connected: false, reason: 'db_error' });
     }
