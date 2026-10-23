@@ -852,8 +852,8 @@
         <h3>Google Calendar</h3>
         <div id="googleCalStatus" class="text-muted" style="margin-bottom:10px;font-size:0.82em">Checking…</div>
         <div id="googleCalConnected" class="hidden">
-            <div class="msg-info" style="margin-bottom:10px">Connected to Google Calendar</div>
-            <button onclick="syncToGoogle(this)" class="btn-accent" style="width:100%;margin-bottom:6px">Sync tasks → Calendar</button>
+            <div class="msg-info" style="margin-bottom:10px">Connected. Your Google events show in the calendar here. Nothing from this app is sent to Google.</div>
+            <button onclick="removePushedEvents(this)" style="width:100%;margin-bottom:6px">Remove events this app added earlier</button>
             <button onclick="disconnectGoogle()" style="width:100%">Disconnect</button>
             <div id="googleSyncResult" style="margin-top:8px"></div>
         </div>
@@ -1125,7 +1125,8 @@
             renderTasks();
             renderCalendar();
             status.innerHTML = '';
-            autoPushToGoogle();
+            googleLoaded.clear();
+            loadGoogleEvents(true);
 
         } catch (err) {
             console.error('[sync error]', err);
@@ -1489,90 +1490,35 @@
         window.location.href = '/api/google-auth';
     }
 
-    // Local tasks as-is, plus upcoming unfinished Stuudium tasks (ids prefixed so they never clash)
-    function buildCalendarPayload() {
-        const now = new Date();
-        const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-        const out = [];
-        localTasks.forEach(t => {
-            if (t.date && t.title) out.push({ id: t.id, title: t.title, date: t.date, time: t.time || '' });
-        });
-        allTasks.forEach(t => {
-            if (!t.id || !t.date || t.completed || !t.description) return;
-            const date = unixToLocalDate(t.date);
-            if (date < today) return;
-            const subj = t.subject && t.subject !== 'Unknown' ? t.subject : '';
-            const title = (subj ? subj + ': ' : '') + t.description;
-            out.push({ id: 'stu:' + t.id, title: title.slice(0, 100), description: t.description, date, time: '' });
-        });
-        return out;
-    }
-
-    // Sends in chunks of 20 (Cloudflare limits outgoing requests per call) and adds up the results
-    async function pushToGoogle() {
-        const payload = buildCalendarPayload();
-        const total = { created: 0, updated: 0, unchanged: 0, skipped: 0, errors: 0, errorSamples: [] };
-        for (let i = 0; i < payload.length; i += 20) {
-            const resp = await fetch('/api/google-sync', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-App-Token': sessionStorage.getItem('app_pass') || '',
-                },
-                body: JSON.stringify({ tasks: payload.slice(i, i + 20) }),
-            });
-            const data = await resp.json().catch(() => ({}));
-            if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
-            for (const k of ['created', 'updated', 'unchanged', 'skipped', 'errors']) total[k] += data[k] || 0;
-            (data.errorSamples || []).forEach(m => { if (total.errorSamples.length < 3 && !total.errorSamples.includes(m)) total.errorSamples.push(m); });
-        }
-        total.sent = payload.length;
-        return total;
-    }
-
-    function showGoogleResult(total) {
+    // One-time cleanup of events this app pushed to Google in earlier versions.
+    // Only events the app created itself are deleted; your own Google events are never touched.
+    async function removePushedEvents(btn) {
         const resultEl = document.getElementById('googleSyncResult');
-        const parts = [];
-        if (total.created) parts.push(`${total.created} created`);
-        if (total.updated) parts.push(`${total.updated} updated`);
-        if (total.unchanged) parts.push(`${total.unchanged} unchanged`);
-        if (total.errors) parts.push(`${total.errors} errors`);
-        let html = `<div class="${total.errors ? 'msg-error' : 'msg-info'}">${parts.join(', ') || 'Nothing to sync'}</div>`;
-        if (total.errorSamples.length) {
-            html += `<div class="text-muted" style="margin-top:6px;font-size:0.8em">${total.errorSamples.map(esc).join('<br>')}</div>`;
-        }
-        resultEl.innerHTML = html;
-    }
-
-    async function syncToGoogle(btn) {
-        const resultEl = document.getElementById('googleSyncResult');
+        if (!confirm('Delete from Google Calendar every event this app created earlier?\nEvents you made yourself are not touched.')) return;
         const prev = btn.textContent;
         btn.disabled = true;
-        btn.textContent = 'Syncing…';
+        btn.textContent = 'Removing…';
         resultEl.innerHTML = '';
+        let deleted = 0, failed = 0, samples = [];
         try {
-            showGoogleResult(await pushToGoogle());
+            for (let i = 0; i < 40; i++) {
+                const resp = await fetch('/api/google-cleanup', { method: 'POST', headers: appHeaders() });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+                deleted += data.deleted; failed += data.failed;
+                (data.errorSamples || []).forEach(m => { if (samples.length < 3 && !samples.includes(m)) samples.push(m); });
+                if (data.remaining === 0 || data.deleted === 0) break;
+            }
+            let html = `<div class="${failed ? 'msg-error' : 'msg-info'}">${deleted} removed${failed ? `, ${failed} failed` : ''}</div>`;
+            if (samples.length) html += `<div class="text-muted" style="margin-top:6px;font-size:0.8em">${samples.map(esc).join('<br>')}</div>`;
+            resultEl.innerHTML = html;
             googleLoaded.clear();
             loadGoogleEvents(true);
         } catch (err) {
-            resultEl.innerHTML = `<div class="msg-error">Sync failed: ${esc(err.message)}</div>`;
+            resultEl.innerHTML = `<div class="msg-error">Cleanup failed: ${esc(err.message)}</div>`;
         } finally {
             btn.disabled = false;
             btn.textContent = prev;
-        }
-    }
-
-    // After a successful Stuudium sync: quietly push to Google if it is connected
-    async function autoPushToGoogle() {
-        try {
-            if (googleConnected === null) await checkGoogleStatus();
-            if (!googleConnected) return;
-            showGoogleResult(await pushToGoogle());
-            googleLoaded.clear();
-            loadGoogleEvents(true);
-        } catch (err) {
-            document.getElementById('googleSyncResult').innerHTML =
-                `<div class="msg-error">Calendar sync failed: ${esc(err.message)}</div>`;
         }
     }
 
@@ -1583,6 +1529,10 @@
             headers: { 'X-App-Token': sessionStorage.getItem('app_pass') || '' },
         });
         document.getElementById('googleSyncResult').innerHTML = '';
+        googleEvents = [];
+        googleLoaded.clear();
+        renderCalendar();
+        renderDayPanel();
         checkGoogleStatus();
     }
 
