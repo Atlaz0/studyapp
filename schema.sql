@@ -16,3 +16,8 @@ CREATE TABLE IF NOT EXISTS stuudium_sessions (
   device TEXT NOT NULL DEFAULT 'unknown',
   updated_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
+
+CREATE TABLE IF NOT EXISTS calendar_event_state (
+  task_id TEXT PRIMARY KEY,
+  body TEXT NOT NULL
+);

@@ -1,7 +1,9 @@
 // Stores Stuudium session cookies (one per device) in D1.
 //   POST { token, device }  -> verify against Stuudium, then save
 //   GET                      -> list stored sessions (device + time, never the cookie itself)
-// Protected by the same X-App-Token (= PASSWORD) check as the other endpoints.
+// Auth: X-App-Token (= PASSWORD) for everything, or X-Ingest-Key (= INGEST_KEY env var)
+// for POST only. The extension uses the ingest key, so it can only add cookies,
+// never read anything, and the app password stays out of the extension.
 
 import { cleanToken, checkSession } from '../_lib/session.js';
 
@@ -10,7 +12,7 @@ const MAX_SESSIONS = 5;
 const CORS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-App-Token',
+    'Access-Control-Allow-Headers': 'Content-Type, X-App-Token, X-Ingest-Key',
 };
 
 export async function onRequest(context) {
@@ -18,8 +20,9 @@ export async function onRequest(context) {
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
 
-    const appToken = request.headers.get('X-App-Token');
-    if (!env.PASSWORD || appToken !== env.PASSWORD) return json({ error: 'Unauthorized' }, 401);
+    const isApp = !!env.PASSWORD && request.headers.get('X-App-Token') === env.PASSWORD;
+    const isIngest = !!env.INGEST_KEY && request.headers.get('X-Ingest-Key') === env.INGEST_KEY;
+    if (!isApp && !(isIngest && request.method === 'POST')) return json({ error: 'Unauthorized' }, 401);
     if (!env.DB) return json({ error: 'D1 database not configured' }, 500);
 
     if (request.method === 'GET') {

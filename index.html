@@ -749,7 +749,7 @@
         <div id="googleCalStatus" class="text-muted" style="margin-bottom:10px;font-size:0.82em">Checking…</div>
         <div id="googleCalConnected" class="hidden">
             <div class="msg-info" style="margin-bottom:10px">Connected to Google Calendar</div>
-            <button onclick="syncToGoogle(this)" class="btn-accent" style="width:100%;margin-bottom:6px">Sync local tasks → Calendar</button>
+            <button onclick="syncToGoogle(this)" class="btn-accent" style="width:100%;margin-bottom:6px">Sync tasks → Calendar</button>
             <button onclick="disconnectGoogle()" style="width:100%">Disconnect</button>
             <div id="googleSyncResult" style="margin-top:8px"></div>
         </div>
@@ -781,6 +781,7 @@
     let hideOld = true;
     let lastDebugSteps = null;
     let localTasks = JSON.parse(localStorage.getItem('local_tasks') || '[]');
+    let googleConnected = null;
     let stuudiumCompleted = new Set(JSON.parse(localStorage.getItem('stuudium_completed') || '[]'));
     let currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     let showStuudiumOnCal = false;
@@ -1017,6 +1018,7 @@
             renderTasks();
             renderCalendar();
             status.innerHTML = '';
+            autoPushToGoogle();
 
         } catch (err) {
             console.error('[sync error]', err);
@@ -1357,6 +1359,7 @@
                 headers: { 'X-App-Token': sessionStorage.getItem('app_pass') || '' },
             });
             const data = await resp.json();
+            googleConnected = !!data.connected;
             statusEl.classList.add('hidden');
             if (data.reason === 'not_configured') {
                 statusEl.textContent = 'Google OAuth not configured (see setup steps).';
@@ -1379,6 +1382,61 @@
         window.location.href = '/api/google-auth';
     }
 
+    // Local tasks as-is, plus upcoming unfinished Stuudium tasks (ids prefixed so they never clash)
+    function buildCalendarPayload() {
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        const out = [];
+        localTasks.forEach(t => {
+            if (t.date && t.title) out.push({ id: t.id, title: t.title, date: t.date, time: t.time || '' });
+        });
+        allTasks.forEach(t => {
+            if (!t.id || !t.date || t.completed || !t.description) return;
+            const date = unixToLocalDate(t.date);
+            if (date < today) return;
+            const subj = t.subject && t.subject !== 'Unknown' ? t.subject : '';
+            const title = (subj ? subj + ': ' : '') + t.description;
+            out.push({ id: 'stu:' + t.id, title: title.slice(0, 100), description: t.description, date, time: '' });
+        });
+        return out;
+    }
+
+    // Sends in chunks of 20 (Cloudflare limits outgoing requests per call) and adds up the results
+    async function pushToGoogle() {
+        const payload = buildCalendarPayload();
+        const total = { created: 0, updated: 0, unchanged: 0, skipped: 0, errors: 0, errorSamples: [] };
+        for (let i = 0; i < payload.length; i += 20) {
+            const resp = await fetch('/api/google-sync', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-App-Token': sessionStorage.getItem('app_pass') || '',
+                },
+                body: JSON.stringify({ tasks: payload.slice(i, i + 20) }),
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+            for (const k of ['created', 'updated', 'unchanged', 'skipped', 'errors']) total[k] += data[k] || 0;
+            (data.errorSamples || []).forEach(m => { if (total.errorSamples.length < 3 && !total.errorSamples.includes(m)) total.errorSamples.push(m); });
+        }
+        total.sent = payload.length;
+        return total;
+    }
+
+    function showGoogleResult(total) {
+        const resultEl = document.getElementById('googleSyncResult');
+        const parts = [];
+        if (total.created) parts.push(`${total.created} created`);
+        if (total.updated) parts.push(`${total.updated} updated`);
+        if (total.unchanged) parts.push(`${total.unchanged} unchanged`);
+        if (total.errors) parts.push(`${total.errors} errors`);
+        let html = `<div class="${total.errors ? 'msg-error' : 'msg-info'}">${parts.join(', ') || 'Nothing to sync'}</div>`;
+        if (total.errorSamples.length) {
+            html += `<div class="text-muted" style="margin-top:6px;font-size:0.8em">${total.errorSamples.map(esc).join('<br>')}</div>`;
+        }
+        resultEl.innerHTML = html;
+    }
+
     async function syncToGoogle(btn) {
         const resultEl = document.getElementById('googleSyncResult');
         const prev = btn.textContent;
@@ -1386,26 +1444,24 @@
         btn.textContent = 'Syncing…';
         resultEl.innerHTML = '';
         try {
-            const resp = await fetch('/api/google-sync', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-App-Token': sessionStorage.getItem('app_pass') || '',
-                },
-                body: JSON.stringify({ tasks: localTasks }),
-            });
-            const data = await resp.json();
-            if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
-            const parts = [];
-            if (data.created) parts.push(`${data.created} created`);
-            if (data.updated) parts.push(`${data.updated} updated`);
-            if (data.errors) parts.push(`${data.errors} errors`);
-            resultEl.innerHTML = `<div class="msg-info">${parts.join(', ') || 'Nothing to sync'}</div>`;
+            showGoogleResult(await pushToGoogle());
         } catch (err) {
             resultEl.innerHTML = `<div class="msg-error">Sync failed: ${esc(err.message)}</div>`;
         } finally {
             btn.disabled = false;
             btn.textContent = prev;
+        }
+    }
+
+    // After a successful Stuudium sync: quietly push to Google if it is connected
+    async function autoPushToGoogle() {
+        try {
+            if (googleConnected === null) await checkGoogleStatus();
+            if (!googleConnected) return;
+            showGoogleResult(await pushToGoogle());
+        } catch (err) {
+            document.getElementById('googleSyncResult').innerHTML =
+                `<div class="msg-error">Calendar sync failed: ${esc(err.message)}</div>`;
         }
     }
 
