@@ -3,6 +3,8 @@
 // Unchanged events are skipped, so repeat syncs make few Google calls
 // (Pages Functions allow ~50 outgoing fetches per request).
 
+import { getAccessToken } from '../_lib/google.js';
+
 const TIME_ZONE = 'Europe/Tallinn';
 const MAX_TASKS = 25;
 
@@ -12,7 +14,7 @@ export async function onRequest(context) {
     }
     if (!isAuthorized(context)) return json({ error: 'Unauthorized' }, 401);
 
-    const { DB, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } = context.env;
+    const { DB } = context.env;
     if (!DB) return json({ error: 'D1 database not configured' }, 500);
 
     let body;
@@ -26,20 +28,9 @@ export async function onRequest(context) {
     if (!Array.isArray(tasks)) return json({ error: 'tasks must be an array' }, 400);
     if (tasks.length > MAX_TASKS) return json({ error: `Send at most ${MAX_TASKS} tasks per request` }, 400);
 
-    const row = await DB.prepare('SELECT * FROM google_tokens WHERE id = 1').first();
-    if (!row) return json({ error: 'Google Calendar not connected', code: 'not_connected' }, 401);
-
-    let accessToken = row.access_token;
-    if (row.expires_at < Math.floor(Date.now() / 1000) + 60) {
-        const refreshed = await refreshToken(row.refresh_token, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET);
-        if (!refreshed.ok) {
-            return json({ error: 'Failed to refresh Google token: ' + (refreshed.error_description || refreshed.error) + ' (try Disconnect, then Connect again)' }, 500);
-        }
-        accessToken = refreshed.access_token;
-        const newExpiry = Math.floor(Date.now() / 1000) + (refreshed.expires_in || 3600);
-        await DB.prepare('UPDATE google_tokens SET access_token = ?, refresh_token = COALESCE(?, refresh_token), expires_at = ? WHERE id = 1')
-            .bind(accessToken, refreshed.refresh_token || null, newExpiry).run();
-    }
+    const auth = await getAccessToken(context.env);
+    if (auth.error) return json({ error: auth.error, code: auth.code }, auth.status);
+    const accessToken = auth.accessToken;
 
     const existing = await DB.prepare('SELECT task_id, event_id FROM calendar_events').all();
     const eventMap = new Map(existing.results.map(r => [r.task_id, r.event_id]));
@@ -165,21 +156,6 @@ async function createEvent(accessToken, ev) {
 async function errorText(resp) {
     const data = await resp.json().catch(() => ({}));
     return `${resp.status} ${data.error?.message || data.error || ''}`.trim();
-}
-
-async function refreshToken(refreshTokenVal, clientId, clientSecret) {
-    const resp = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            grant_type: 'refresh_token',
-            refresh_token: refreshTokenVal,
-            client_id: clientId,
-            client_secret: clientSecret,
-        }),
-    });
-    const data = await resp.json();
-    return { ok: resp.ok && !data.error, ...data };
 }
 
 function isAuthorized(context) {

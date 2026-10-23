@@ -8,6 +8,7 @@ export async function onRequest(context) {
     if (!DB) return json({ error: 'D1 not configured' }, 500);
     await DB.prepare('DELETE FROM google_tokens WHERE id = 1').run();
     await DB.prepare('DELETE FROM calendar_events').run();
+    await DB.prepare('DELETE FROM calendar_event_state').run().catch(() => {});
     return json({ ok: true });
 }
 

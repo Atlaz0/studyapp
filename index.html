@@ -662,6 +662,116 @@
         .debug-step-body span.val.bool-true { color: #4ec9b0; }
         .debug-step-body span.val.bool-false { color: #f48771; }
         .debug-step-body span.val.num { color: #b5cea8; }
+
+        /* ── Calendar-first layout (v2) ──────────────────────────── */
+
+        :root { --blue: #6aa6ff; --blue-lo: #1b2d4d; }
+
+        .app-layout { grid-template-columns: minmax(0, 1fr) 340px; }
+
+        .calendar-panel { align-self: stretch; overflow: auto; }
+        .cal-nav { gap: 8px; margin-bottom: 8px; }
+        .cal-title { font-size: 1.2em; }
+        #syncStatus { margin-bottom: 6px; }
+
+        .cal-legend { display: flex; gap: 14px; font-size: 0.72em; color: var(--text-2); margin-bottom: 10px; }
+        .cal-legend .lg::before {
+            content: ''; display: inline-block; width: 9px; height: 9px;
+            border-radius: 2px; margin-right: 5px; vertical-align: -1px;
+        }
+        .cal-legend .lg.stuudium::before { background: var(--accent); }
+        .cal-legend .lg.local::before { background: var(--green); }
+        .cal-legend .lg.google::before { background: var(--blue); }
+
+        .cal-grid { flex: 1; min-height: 0; }
+        .cal-header-cell { font-size: 0.78em; color: var(--text-2); }
+        .cal-days-grid { flex: 1; grid-auto-rows: minmax(78px, 1fr); gap: 4px; }
+
+        .cal-cell {
+            aspect-ratio: auto;
+            align-items: stretch;
+            padding: 4px 5px;
+            gap: 3px;
+            overflow: hidden;
+            min-width: 0;
+            cursor: pointer;
+            background: var(--surf-1);
+        }
+        .cal-cell:not(.empty):hover { border-color: var(--accent); }
+
+        .cal-num {
+            width: auto; height: 22px; min-width: 22px;
+            padding: 0 5px;
+            justify-content: flex-start;
+            align-self: flex-start;
+            border-radius: 4px;
+            font-size: 0.88em; font-weight: 500;
+            color: var(--text);
+        }
+        .cal-cell.weekend .cal-num { color: var(--text-2); }
+        .cal-cell.other-month { background: transparent; }
+        .cal-cell.other-month .cal-num { color: var(--text-3); }
+        .cal-cell.today { border-color: var(--accent); background: rgba(224, 117, 58, 0.07); }
+        .cal-cell.today .cal-num { background: var(--accent); color: #fff; font-weight: 600; }
+        .cal-cell.selected { box-shadow: inset 0 0 0 1px var(--accent); }
+
+        .cal-chips { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow: hidden; }
+        .cal-chip {
+            font-size: 0.7em; line-height: 1.4;
+            padding: 1px 5px;
+            border-radius: 3px;
+            border-left: 3px solid;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .cal-chip.stuudium { background: rgba(224, 117, 58, 0.18); border-color: var(--accent); color: #f6cfb6; }
+        .cal-chip.local    { background: var(--green-lo); border-color: var(--green); color: #aaf0cb; }
+        .cal-chip.google   { background: var(--blue-lo); border-color: var(--blue); color: #c3dbff; }
+        .cal-chip.done { opacity: 0.45; text-decoration: line-through; }
+        .cal-cell.other-month .cal-chip { opacity: 0.6; }
+        .cal-more { font-size: 0.68em; color: var(--text-2); padding-left: 6px; }
+
+        .panel-side { display: grid; grid-template-rows: auto 1fr; gap: 10px; min-height: 0; }
+
+        .day-panel {
+            background: var(--surf-1);
+            border: 1px solid var(--accent-lo);
+            border-left: 2px solid var(--accent-lo);
+            border-radius: 8px;
+            padding: 14px;
+            max-height: 46vh;
+            overflow-y: auto;
+        }
+        .day-panel .panel-label { color: var(--text-2); font-size: 0.8em; }
+
+        .day-item {
+            display: flex; align-items: flex-start; gap: 10px;
+            padding: 8px 8px 8px 10px;
+            margin-bottom: 5px;
+            background: var(--surf-2);
+            border-left: 3px solid;
+            border-radius: 5px;
+        }
+        .day-item.stuudium { border-color: var(--accent); }
+        .day-item.local { border-color: var(--green); }
+        .day-item.google { border-color: var(--blue); }
+        .day-item.done .day-item-title { text-decoration: line-through; color: var(--text-3); }
+        .day-item input[type="checkbox"] { margin-top: 2px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+        .day-item-body { flex: 1; min-width: 0; }
+        .day-item-meta { font-size: 0.72em; color: var(--text-2); margin-bottom: 2px; }
+        .day-item-title { font-size: 0.85em; color: var(--text); line-height: 1.4; word-break: break-word; }
+        .day-badge {
+            flex-shrink: 0; width: 13px; text-align: center;
+            font-size: 0.7em; font-weight: 700; color: var(--blue);
+        }
+
+        @media (max-width: 760px) {
+            .app-layout { grid-template-columns: 1fr; height: auto; min-height: 100vh; }
+            .calendar-panel { overflow: visible; }
+            .cal-days-grid { grid-auto-rows: minmax(58px, auto); }
+            .cal-chip { height: 5px; padding: 0; border-left-width: 0; border-radius: 2px; }
+            .cal-chip-text { display: none; }
+            .day-panel { max-height: none; }
+        }
     </style>
 </head>
 <body>
@@ -685,22 +795,29 @@
 <!-- ── Main app layout ───────────────────────────────────────────── -->
 <div id="stepTasks" class="app-layout hidden">
 
-    <!-- Left panel -->
-    <div class="panel-left">
+    <!-- Calendar: the main view -->
+    <div class="calendar-panel">
+        <div class="cal-nav">
+            <button class="btn-icon" onclick="prevMonth()"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,2 4,6 8,10"/></svg></button>
+            <span id="calTitle" class="cal-title"></span>
+            <button class="btn-icon" onclick="nextMonth()"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,2 8,6 4,10"/></svg></button>
+            <button onclick="goToday()" style="padding:4px 8px;font-size:0.75em">Today</button>
+            <button class="btn-accent" onclick="syncTasks()" style="padding:4px 10px;font-size:0.75em">↻ Sync</button>
+        </div>
+        <div class="cal-legend">
+            <span class="lg stuudium">Stuudium</span>
+            <span class="lg local">My tasks</span>
+            <span class="lg google">Google</span>
+        </div>
+        <div id="syncStatus"></div>
+        <div class="cal-grid" id="calGrid"></div>
+    </div>
 
-        <!-- Calendar -->
-        <div class="calendar-panel">
-            <div class="cal-nav">
-                <button class="btn-icon" onclick="prevMonth()"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,2 4,6 8,10"/></svg></button>
-                <span id="calTitle" class="cal-title"></span>
-                <button class="btn-icon" onclick="nextMonth()"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,2 8,6 4,10"/></svg></button>
-                <button onclick="goToday()" style="padding:4px 8px;font-size:0.75em">Today</button>
-                <label class="cal-toggle">
-                    <input type="checkbox" id="showStuudiumToggle" onchange="toggleStuudiumCal()">
-                    Stuudium
-                </label>
-            </div>
-            <div class="cal-grid" id="calGrid"></div>
+    <!-- Side: selected day + new task -->
+    <div class="panel-side">
+        <div class="day-panel">
+            <div class="panel-label" id="dayPanelTitle"></div>
+            <div id="dayPanelList"></div>
         </div>
 
         <!-- Task creation -->
@@ -714,19 +831,6 @@
             </div>
             <div id="localTasksList" class="local-tasks-list"></div>
         </div>
-    </div>
-
-    <!-- Right panel -->
-    <div class="panel-right">
-        <div class="right-toolbar">
-            <span class="panel-title">Stuudium</span>
-            <div class="toolbar-actions">
-                <button class="btn-accent" onclick="syncTasks()">↻ Sync</button>
-                <span id="filterBtn" class="show-old-link" onclick="toggleOldFilter()"></span>
-            </div>
-        </div>
-        <div id="syncStatus"></div>
-        <div id="tasksList" class="tasks-scroll"></div>
     </div>
 </div>
 
@@ -762,12 +866,6 @@
     </div>
 </div>
 
-<!-- ── Calendar hover popup ─────────────────────────────────────── -->
-<div id="calPopup" class="cal-popup hidden">
-    <div class="cal-popup-date"></div>
-    <div class="cal-popup-tasks"></div>
-</div>
-
 <!-- ── Settings FAB ─────────────────────────────────────────────── -->
 <button class="fab" onclick="openSettings()" title="Settings">
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -778,13 +876,14 @@
 
 <script>
     let allTasks = [];
-    let hideOld = true;
     let lastDebugSteps = null;
     let localTasks = JSON.parse(localStorage.getItem('local_tasks') || '[]');
     let googleConnected = null;
+    let selectedDate = null;          // 'YYYY-MM-DD' shown in the day panel (default today)
+    let googleEvents = [];            // expanded Google events: { id, title, date, time }
+    const googleLoaded = new Set();   // months already fetched from Google
     let stuudiumCompleted = new Set(JSON.parse(localStorage.getItem('stuudium_completed') || '[]'));
     let currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    let showStuudiumOnCal = false;
 
     window.addEventListener('DOMContentLoaded', () => {
         const tn = new Date();
@@ -794,20 +893,27 @@
             if (e.key === 'Enter') addLocalTask();
         });
 
-        // Delegated listener for Stuudium task checkboxes (survives innerHTML replacement)
-        document.getElementById('tasksList').addEventListener('change', e => {
-            const id = e.target.dataset.taskId;
-            if (id) toggleStuudiumTask(id);
+        // Day panel checkboxes (delegated, survives innerHTML replacement)
+        document.getElementById('dayPanelList').addEventListener('change', e => {
+            const id = e.target.dataset.id;
+            if (!id) return;
+            if (e.target.dataset.kind === 'stuudium') toggleStuudiumTask(id);
+            else if (e.target.dataset.kind === 'local') toggleLocalTask(id);
         });
 
-        // Calendar hover delegation on stable parent
-        const calGrid = document.getElementById('calGrid');
-        calGrid.addEventListener('mousemove', e => {
+        // Click a day to see it in the side panel
+        document.getElementById('calGrid').addEventListener('click', e => {
             const cell = e.target.closest('.cal-cell:not(.empty)');
-            if (cell) showCalPopup(cell, e.clientX, e.clientY);
-            else hideCalPopup();
+            if (!cell || !cell.dataset.date) return;
+            selectedDate = cell.dataset.date;
+            if (cell.classList.contains('other-month')) {
+                const [y, m] = selectedDate.split('-').map(Number);
+                currentMonthStart = new Date(y, m - 1, 1);
+                loadGoogleEvents();
+            }
+            renderCalendar();
+            renderDayPanel();
         });
-        calGrid.addEventListener('mouseleave', hideCalPopup);
 
         // Settings modal click-outside
         document.getElementById('settingsModal').addEventListener('click', e => {
@@ -817,8 +923,8 @@
         const auth = sessionStorage.getItem('auth');
 
         renderCalendar();
+        renderDayPanel();
         renderLocalTasks();
-        updateFilterLink();
 
         if (new URLSearchParams(location.search).get('google') === 'connected') {
             history.replaceState(null, '', location.pathname);
@@ -958,6 +1064,7 @@
         document.getElementById('stepTasks').classList.remove('hidden');
         const overlay = document.getElementById('authOverlay');
         if (overlay) overlay.classList.add('hidden');
+        loadGoogleEvents();
     }
 
     // ── Sync ──────────────────────────────────────────────────────────────────
@@ -1045,64 +1152,12 @@
         }
     }
 
-    // ── Filter ────────────────────────────────────────────────────────────────
-
-    function toggleOldFilter() {
-        hideOld = !hideOld;
-        renderTasks();
-    }
-
-    function updateFilterLink() {
-        const btn = document.getElementById('filterBtn');
-        if (!btn) return;
-        if (hideOld) {
-            const now = Math.floor(Date.now() / 1000);
-            const count = allTasks.filter(t =>
-                !stuudiumCompleted.has(t.id) && t.date && parseInt(t.date) < now
-            ).length;
-            btn.textContent = count > 0 ? `show old (${count})` : '';
-        } else {
-            btn.textContent = 'hide old';
-        }
-    }
-
     // ── Render Stuudium tasks ─────────────────────────────────────────────────
 
+    // Stuudium tasks live in the calendar now; this just redraws it and the day panel
     function renderTasks() {
-        const list = document.getElementById('tasksList');
-        const now = Math.floor(Date.now() / 1000);
-
-        const displayTasks = hideOld
-            ? allTasks.filter(t => stuudiumCompleted.has(t.id) || !(t.date && parseInt(t.date) < now))
-            : allTasks;
-
-        updateFilterLink();
-
-        if (!displayTasks.length) {
-            list.innerHTML = '<p class="empty-state">No tasks.</p>';
-            return;
-        }
-
-        list.innerHTML = displayTasks.map(task => {
-            const isCompleted = stuudiumCompleted.has(task.id);
-            const dateStr = task.date
-                ? new Date(parseInt(task.date) * 1000).toLocaleDateString('en-GB', {
-                    weekday: 'short', day: 'numeric', month: 'short'
-                  })
-                : 'No date';
-
-            return `<div class="task ${isCompleted ? 'completed' : ''}">
-                <div style="flex:1;min-width:0">
-                    <div class="task-meta">
-                        <span>${esc(task.subject)}</span>
-                        <span>${dateStr}</span>
-                        ${task.duration ? `<span>${esc(task.duration)}</span>` : ''}
-                    </div>
-                    <div class="task-title">${esc(task.description)}</div>
-                </div>
-                <input type="checkbox" data-task-id="${esc(task.id)}" ${isCompleted ? 'checked' : ''}>
-            </div>`;
-        }).join('');
+        renderCalendar();
+        renderDayPanel();
     }
 
     function toggleStuudiumTask(id) {
@@ -1134,11 +1189,12 @@
         titleEl.value = '';
         renderLocalTasks();
         renderCalendar();
+        renderDayPanel();
     }
 
     function toggleLocalTask(id) {
         const t = localTasks.find(t => t.id === id);
-        if (t) { t.completed = !t.completed; saveLocalTasks(); renderLocalTasks(); }
+        if (t) { t.completed = !t.completed; saveLocalTasks(); renderLocalTasks(); renderCalendar(); renderDayPanel(); }
     }
 
     function deleteLocalTask(id) {
@@ -1146,6 +1202,7 @@
         saveLocalTasks();
         renderLocalTasks();
         renderCalendar();
+        renderDayPanel();
     }
 
     function renderLocalTasks() {
@@ -1154,7 +1211,6 @@
             el.innerHTML = '<p class="text-muted" style="padding:4px 0">No tasks yet.</p>';
             return;
         }
-        updateFilterLink();
         const sorted = [...localTasks].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
         el.innerHTML = sorted.map(t => `
             <div class="local-task-row ${t.completed ? 'done' : ''}">
@@ -1166,73 +1222,26 @@
         `).join('');
     }
 
-    // ── Stuudium-on-calendar toggle ───────────────────────────────────────────
-
-    function toggleStuudiumCal() {
-        showStuudiumOnCal = document.getElementById('showStuudiumToggle').checked;
-        renderCalendar();
-    }
-
-    // ── Calendar popup ────────────────────────────────────────────────────────
-
-    function showCalPopup(cell, mouseX, mouseY) {
-        const dateStr = cell.dataset.date;
-        if (!dateStr) return;
-
-        const dayTasks = [];
-        localTasks.forEach(t => {
-            if (t.date === dateStr) dayTasks.push({ type: 'local', title: t.title, time: t.time || '', completed: t.completed });
-        });
-        allTasks.forEach(t => {
-            if (!t.date) return;
-            if (unixToLocalDate(t.date) === dateStr) {
-                dayTasks.push({ type: 'stuudium', title: t.description, subject: t.subject, completed: stuudiumCompleted.has(t.id) });
-            }
-        });
-
-        const popup = document.getElementById('calPopup');
-        if (!dayTasks.length) { popup.classList.add('hidden'); return; }
-
-        const [y, m, d] = dateStr.split('-').map(Number);
-        const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(y, m - 1, d).getDay()];
-        const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1];
-        popup.querySelector('.cal-popup-date').textContent = `${dow}, ${d} ${mo}`;
-        popup.querySelector('.cal-popup-tasks').innerHTML = dayTasks.map(t => {
-            const timeStr = t.time ? `<span class="subj"> · ${esc(t.time)}</span>` : '';
-            const subjStr = t.subject ? `<span class="subj">${esc(t.subject)} · </span>` : '';
-            return `<div class="cal-popup-task ${t.completed ? 'done' : ''}">${subjStr}${esc(t.title)}${timeStr}</div>`;
-        }).join('');
-
-        // Position near cursor, clamp using actual rendered dimensions
-        popup.style.visibility = 'hidden';
-        popup.style.left = (mouseX + 12) + 'px';
-        popup.style.top = (mouseY + 12) + 'px';
-        popup.classList.remove('hidden');
-        const rect = popup.getBoundingClientRect();
-        if (rect.right > window.innerWidth - 8) popup.style.left = (mouseX - rect.width - 8) + 'px';
-        if (rect.bottom > window.innerHeight - 8) popup.style.top = (mouseY - rect.height - 8) + 'px';
-        popup.style.visibility = '';
-    }
-
-    function hideCalPopup() {
-        document.getElementById('calPopup')?.classList.add('hidden');
-    }
-
     // ── Calendar ──────────────────────────────────────────────────────────────
 
     function prevMonth() {
         currentMonthStart = new Date(currentMonthStart.getFullYear(), currentMonthStart.getMonth() - 1, 1);
         renderCalendar();
+        loadGoogleEvents();
     }
 
     function nextMonth() {
         currentMonthStart = new Date(currentMonthStart.getFullYear(), currentMonthStart.getMonth() + 1, 1);
         renderCalendar();
+        loadGoogleEvents();
     }
 
     function goToday() {
         currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        selectedDate = null;
         renderCalendar();
+        renderDayPanel();
+        loadGoogleEvents();
     }
 
     function unixToLocalDate(unixSeconds) {
@@ -1248,82 +1257,180 @@
         return `${parseInt(parts[2])} ${months[parseInt(parts[1]) - 1] || ''}`;
     }
 
+    function pad2(n) { return String(n).padStart(2, '0'); }
+    function ymd(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+
+    // date -> sorted list of everything on that day (Stuudium, my tasks, Google)
+    function buildDayIndex() {
+        const idx = new Map();
+        const add = (date, item) => {
+            if (!idx.has(date)) idx.set(date, []);
+            idx.get(date).push(item);
+        };
+        allTasks.forEach(t => {
+            if (!t.date) return;
+            add(unixToLocalDate(t.date), {
+                kind: 'stuudium', id: t.id, title: t.description || '',
+                subject: t.subject && t.subject !== 'Unknown' ? t.subject : '',
+                time: '', completed: stuudiumCompleted.has(t.id),
+            });
+        });
+        localTasks.forEach(t => {
+            if (!t.date) return;
+            add(t.date, { kind: 'local', id: t.id, title: t.title, subject: '', time: t.time || '', completed: !!t.completed });
+        });
+        googleEvents.forEach(e => {
+            add(e.date, { kind: 'google', id: e.id, title: e.title, subject: '', time: e.time || '', completed: false });
+        });
+        for (const list of idx.values()) list.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'));
+        return idx;
+    }
+
+    function chipLabel(it) {
+        return (it.time ? it.time + ' ' : '') + (it.subject ? it.subject + ': ' : '') + it.title;
+    }
+
     function renderCalendar() {
         const grid = document.getElementById('calGrid');
         const titleEl = document.getElementById('calTitle');
         if (!grid) return;
 
-        const _td = new Date();
-        const todayStr = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`;
+        const todayStr = ymd(new Date());
+        const sel = selectedDate || todayStr;
         const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
         const DAY_NAMES = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+        const MAX_CHIPS = 3;
 
         const year = currentMonthStart.getFullYear();
         const month = currentMonthStart.getMonth();
         titleEl.textContent = `${MONTHS[month]} ${year}`;
 
-        // Offset: Mon=0 … Sun=6
         const firstDow = new Date(year, month, 1).getDay();
-        const offset = firstDow === 0 ? 6 : firstDow - 1;
+        const offset = firstDow === 0 ? 6 : firstDow - 1;   // Mon = 0
         const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-        // Build dot sets: local tasks always, Stuudium tasks only if toggle is on
-        const localDays = new Set();
-        const stuudiumDays = new Set();
-        localTasks.forEach(t => {
-            const [ty, tm, td] = t.date.split('-').map(Number);
-            if (ty === year && tm - 1 === month) localDays.add(td);
-        });
-        if (showStuudiumOnCal) {
-            allTasks.forEach(t => {
-                if (!t.date) return;
-                const ds = unixToLocalDate(t.date);
-                const [ty, tm, td] = ds.split('-').map(Number);
-                if (ty === year && tm - 1 === month) stuudiumDays.add(td);
-            });
-        }
+        const rows = Math.ceil((offset + daysInMonth) / 7);
+        const index = buildDayIndex();
 
         const headers = DAY_NAMES.map((d, i) =>
             `<div class="cal-header-cell ${i >= 5 ? 'weekend' : ''}">${d}</div>`
         ).join('');
 
-        // Previous month overflow
-        const prevYear = month === 0 ? year - 1 : year;
-        const prevMonthIdx = month === 0 ? 11 : month - 1;
-        const prevMonthLastDay = new Date(year, month, 0).getDate();
-        const prevCells = Array.from({ length: offset }, (_, i) => {
-            const day = prevMonthLastDay - offset + 1 + i;
-            const ds = `${prevYear}-${String(prevMonthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            return `<div class="cal-cell other-month" data-date="${ds}"><span class="cal-num">${day}</span></div>`;
-        }).join('');
-
-        // Current month cells
-        const dayCells = Array.from({ length: daysInMonth }, (_, i) => {
-            const day = i + 1;
-            const dow = (offset + i) % 7;
-            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            const isToday = dateStr === todayStr;
-            const isWeekend = dow >= 5;
-            const dots = (localDays.has(day) ? '<span class="cal-dot"></span>' : '') +
-                          (stuudiumDays.has(day) ? '<span class="cal-dot" style="background:var(--text-3)"></span>' : '');
-            return `<div class="cal-cell ${isToday ? 'today' : ''} ${isWeekend ? 'weekend' : ''}" data-date="${dateStr}">
-                <span class="cal-num">${day}</span>
-                ${dots ? `<div style="display:flex;gap:2px">${dots}</div>` : ''}
+        // every cell of the visible grid, including the neighbouring months' days
+        const cells = Array.from({ length: rows * 7 }, (_, i) => {
+            const d = new Date(year, month, 1 - offset + i);
+            const dateStr = ymd(d);
+            const inMonth = d.getMonth() === month;
+            const items = index.get(dateStr) || [];
+            const shown = items.slice(0, MAX_CHIPS).map(it =>
+                `<div class="cal-chip ${it.kind} ${it.completed ? 'done' : ''}" title="${esc(chipLabel(it))}"><span class="cal-chip-text">${esc(chipLabel(it))}</span></div>`
+            ).join('');
+            const more = items.length > MAX_CHIPS ? `<div class="cal-more">+${items.length - MAX_CHIPS} more</div>` : '';
+            const cls = [
+                'cal-cell',
+                inMonth ? '' : 'other-month',
+                dateStr === todayStr ? 'today' : '',
+                dateStr === sel ? 'selected' : '',
+                (i % 7) >= 5 ? 'weekend' : '',
+            ].join(' ');
+            return `<div class="${cls}" data-date="${dateStr}">
+                <span class="cal-num">${d.getDate()}</span>
+                <div class="cal-chips">${shown}${more}</div>
             </div>`;
         }).join('');
 
-        // Next month overflow to complete the last row
-        const totalUsed = offset + daysInMonth;
-        const nextOverflow = totalUsed % 7 === 0 ? 0 : 7 - (totalUsed % 7);
-        const nextYear = month === 11 ? year + 1 : year;
-        const nextMonthIdx = month === 11 ? 0 : month + 1;
-        const nextCells = Array.from({ length: nextOverflow }, (_, i) => {
-            const day = i + 1;
-            const ds = `${nextYear}-${String(nextMonthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            return `<div class="cal-cell other-month" data-date="${ds}"><span class="cal-num">${day}</span></div>`;
-        }).join('');
+        grid.innerHTML = `<div class="cal-header-row">${headers}</div><div class="cal-days-grid" style="grid-template-rows:repeat(${rows},minmax(78px,1fr))">${cells}</div>`;
+    }
 
-        grid.innerHTML = `<div class="cal-header-row">${headers}</div><div class="cal-days-grid">${prevCells}${dayCells}${nextCells}</div>`;
+    // ── Day panel (click a day in the calendar) ───────────────────────────────
+
+    function renderDayPanel() {
+        const titleEl = document.getElementById('dayPanelTitle');
+        const list = document.getElementById('dayPanelList');
+        if (!titleEl || !list) return;
+
+        const todayStr = ymd(new Date());
+        const date = selectedDate || todayStr;
+        const [y, m, d] = date.split('-').map(Number);
+        const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(y, m - 1, d).getDay()];
+        const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1];
+        titleEl.textContent = `${dow}, ${d} ${mo}${date === todayStr ? ' · today' : ''}`;
+
+        const items = buildDayIndex().get(date) || [];
+        if (!items.length) {
+            list.innerHTML = '<p class="text-muted" style="padding:2px 0">Nothing on this day.</p>';
+            return;
+        }
+        list.innerHTML = items.map(it => {
+            const meta = [it.subject, it.time, it.kind === 'google' ? 'Google' : (it.kind === 'local' ? 'My task' : '')]
+                .filter(Boolean).map(esc).join(' · ');
+            const control = it.kind === 'google'
+                ? '<span class="day-badge">G</span>'
+                : `<input type="checkbox" data-kind="${it.kind}" data-id="${esc(it.id)}" ${it.completed ? 'checked' : ''}>`;
+            return `<div class="day-item ${it.kind} ${it.completed ? 'done' : ''}">
+                ${control}
+                <div class="day-item-body">
+                    <div class="day-item-meta">${meta}</div>
+                    <div class="day-item-title">${esc(it.title)}</div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // ── Google events shown in the calendar ───────────────────────────────────
+
+    function visibleRange() {
+        const year = currentMonthStart.getFullYear();
+        const month = currentMonthStart.getMonth();
+        const firstDow = new Date(year, month, 1).getDay();
+        const offset = firstDow === 0 ? 6 : firstDow - 1;
+        const rows = Math.ceil((offset + new Date(year, month + 1, 0).getDate()) / 7);
+        return {
+            from: ymd(new Date(year, month, 1 - offset)),
+            to: ymd(new Date(year, month, 1 - offset + rows * 7)),   // exclusive
+        };
+    }
+
+    function expandGoogleEvents(events) {
+        const out = [];
+        for (const e of events) {
+            if (e.allDay) {
+                let d = new Date(e.start + 'T00:00:00');
+                const end = new Date(e.end + 'T00:00:00');
+                for (let i = 0; i < 31; i++) {
+                    out.push({ id: e.id, title: e.title, date: ymd(d), time: '' });
+                    d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+                    if (d >= end) break;
+                }
+            } else {
+                const d = new Date(e.start);
+                out.push({ id: e.id, title: e.title, date: ymd(d), time: `${pad2(d.getHours())}:${pad2(d.getMinutes())}` });
+            }
+        }
+        return out;
+    }
+
+    async function loadGoogleEvents(force = false) {
+        try {
+            if (googleConnected === null) await checkGoogleStatus();
+            if (!googleConnected) return;
+            const key = `${currentMonthStart.getFullYear()}-${currentMonthStart.getMonth()}`;
+            if (!force && googleLoaded.has(key)) return;
+
+            const { from, to } = visibleRange();
+            const resp = await fetch('/api/google-events', {
+                method: 'POST', headers: appHeaders(), body: JSON.stringify({ from, to }),
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+
+            const fresh = expandGoogleEvents(data.events || []).filter(e => e.date >= from && e.date < to);
+            googleEvents = googleEvents.filter(e => e.date < from || e.date >= to).concat(fresh);
+            googleLoaded.add(key);
+            renderCalendar();
+            renderDayPanel();
+        } catch (err) {
+            console.error('[google events]', err);
+        }
     }
 
     // ── Debug table ───────────────────────────────────────────────────────────
@@ -1445,6 +1552,8 @@
         resultEl.innerHTML = '';
         try {
             showGoogleResult(await pushToGoogle());
+            googleLoaded.clear();
+            loadGoogleEvents(true);
         } catch (err) {
             resultEl.innerHTML = `<div class="msg-error">Sync failed: ${esc(err.message)}</div>`;
         } finally {
@@ -1459,6 +1568,8 @@
             if (googleConnected === null) await checkGoogleStatus();
             if (!googleConnected) return;
             showGoogleResult(await pushToGoogle());
+            googleLoaded.clear();
+            loadGoogleEvents(true);
         } catch (err) {
             document.getElementById('googleSyncResult').innerHTML =
                 `<div class="msg-error">Calendar sync failed: ${esc(err.message)}</div>`;
